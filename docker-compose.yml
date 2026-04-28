@@ -3,6 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: codeforge
       POSTGRES_PASSWORD: password
@@ -11,13 +12,75 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-service:
+    build:
+      context: .
+      dockerfile: apps/api-service/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://codeforge:password@postgres:5432/codeforge
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change_me_in_production
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  socket-service:
+    build:
+      context: .
+      dockerfile: apps/socket-service/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  execution-service:
+    build:
+      context: .
+      dockerfile: apps/execution-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      WORKER_CONCURRENCY: 4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

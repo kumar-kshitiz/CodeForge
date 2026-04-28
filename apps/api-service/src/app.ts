@@ -1,30 +1,35 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import healthRouter from './routes/health';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import router from './routes';
+import { errorMiddleware } from './middleware/error.middleware';
 
 const app: Application = express();
 
-// Security Middleware
 app.use(helmet());
-
-// CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
-
-// Body parsing Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// Routes
-app.use('/health', healthRouter);
-
-// Global Error Handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal Server Error' });
+// Rate limit auth endpoints to prevent brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+app.use('/auth/login', authLimiter);
+app.use('/auth/register', authLimiter);
+
+app.use('/api', router);
+
+app.use(errorMiddleware);
 
 export default app;

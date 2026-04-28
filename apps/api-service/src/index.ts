@@ -1,21 +1,30 @@
 import dotenv from 'dotenv';
-import http from 'http';
-import app from './app';
-
 dotenv.config();
 
-const PORT = process.env.PORT || 3001;
+import http from 'http';
+import app from './app';
+import { env } from './config/env';
+import { prisma } from './prisma/client';
 
 const server = http.createServer(app);
 
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+async function start(): Promise<void> {
+  await prisma.$connect();
+  console.log('[api-service] database connected');
+
+  server.listen(env.port, () => {
+    console.log(`[api-service] listening on port ${env.port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('[api-service] failed to start:', err);
+  process.exit(1);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
+process.on('SIGTERM', async () => {
+  server.close(async () => {
+    await prisma.$disconnect();
+    console.log('[api-service] shut down');
   });
 });
