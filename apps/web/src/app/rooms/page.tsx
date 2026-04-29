@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Room {
@@ -21,12 +21,14 @@ export default function RoomsPage() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') ?? '' : '';
+  function getToken(): string {
+    return typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '';
+  }
 
-  async function fetchRooms() {
+  const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch(`${API}/api/rooms`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
       setRooms(data.rooms ?? []);
@@ -35,11 +37,11 @@ export default function RoomsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchRooms();
-  }, []);
+  }, [fetchRooms]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -52,7 +54,7 @@ export default function RoomsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify({ title: title.trim() }),
       });

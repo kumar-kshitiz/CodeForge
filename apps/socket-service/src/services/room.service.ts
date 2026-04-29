@@ -35,6 +35,10 @@ export async function setRoomCode(roomId: string, code: string, language: string
   await redis.set(langKey(roomId), language, 'EX', PRESENCE_TTL);
 }
 
+export async function setRoomLanguage(roomId: string, language: string): Promise<void> {
+  await redis.set(langKey(roomId), language, 'EX', PRESENCE_TTL);
+}
+
 export async function getRoomCode(roomId: string): Promise<{ code: string; language: string } | null> {
   const [code, language] = await Promise.all([
     redis.get(codeKey(roomId)),

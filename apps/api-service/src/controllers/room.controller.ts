@@ -37,7 +37,7 @@ export async function listRooms(req: Request, res: Response, next: NextFunction)
 export async function saveSnapshot(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const internalKey = req.headers['x-internal-key'];
-    if (internalKey !== 'socket-service' && !req.user) {
+    if (internalKey !== 'socket-service') {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }

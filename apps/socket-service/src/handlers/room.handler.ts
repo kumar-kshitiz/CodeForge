@@ -4,6 +4,8 @@ import { addUserToRoom, removeUserFromRoom, getRoomUsers, getRoomCode } from '..
 import { cancelDebounce } from '../utils/debounce';
 
 export function registerRoomHandlers(io: Server, socket: Socket): void {
+  const joinedRooms = new Set<string>();
+
   socket.on(SocketEvent.JOIN_ROOM, async (payload: { roomId: string }) => {
     const { roomId } = payload;
     const user: RoomUser = {
@@ -13,6 +15,7 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
     };
 
     await socket.join(roomId);
+    joinedRooms.add(roomId);
     await addUserToRoom(roomId, user);
 
     const participants = await getRoomUsers(roomId);
@@ -32,6 +35,7 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
 
   socket.on(SocketEvent.LEAVE_ROOM, async (payload: { roomId: string }) => {
     const { roomId } = payload;
+    joinedRooms.delete(roomId);
     await socket.leave(roomId);
     await removeUserFromRoom(roomId, socket.id);
 
@@ -41,9 +45,8 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
   });
 
   socket.on('disconnect', async () => {
-    const rooms = Array.from(socket.rooms).filter((r) => r !== socket.id);
     await Promise.all(
-      rooms.map(async (roomId) => {
+      Array.from(joinedRooms).map(async (roomId) => {
         await removeUserFromRoom(roomId, socket.id);
         cancelDebounce(`autosave:${roomId}`);
         const participants = await getRoomUsers(roomId);
@@ -51,6 +54,7 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
         socket.to(roomId).emit(SocketEvent.PARTICIPANTS, { participants });
       })
     );
+    joinedRooms.clear();
     console.log(`[socket] ${socket.data.username} disconnected`);
   });
 }

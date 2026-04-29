@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
 import { SocketEvent, CodePayload, LangPayload } from '@codeforge/shared-types';
-import { setRoomCode } from '../services/room.service';
+import { setRoomCode, setRoomLanguage } from '../services/room.service';
 import { scheduleAutosave } from '../services/autosave.service';
 
 export function registerCodeHandlers(socket: Socket): void {
@@ -15,7 +15,8 @@ export function registerCodeHandlers(socket: Socket): void {
   socket.on(SocketEvent.LANGUAGE_CHANGE, async (payload: LangPayload) => {
     const { roomId, language } = payload;
 
-    await setRoomCode(roomId, '', language);
+    await setRoomLanguage(roomId, language);
     socket.to(roomId).emit(SocketEvent.LANGUAGE_UPDATE, { language });
   });
 }
+

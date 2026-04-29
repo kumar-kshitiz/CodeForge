@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { SocketEvent } from '@codeforge/shared-types';
-import type { RoomUser, CodePayload, LangPayload, CursorPayload } from '@codeforge/shared-types';
-import { getSocket, disconnectSocket } from '../../../lib/socket';
+import type { RoomUser, CodePayload, LangPayload } from '@codeforge/shared-types';
+import { getSocket } from '../../../lib/socket';
 import { useRoomStore } from '../../../store/roomStore';
 import RoomHeader from '../../../components/room/RoomHeader';
 import PresenceBar from '../../../components/room/PresenceBar';
@@ -12,78 +12,98 @@ import LanguageSelector from '../../../components/room/LanguageSelector';
 import CodeEditor from '../../../components/editor/CodeEditor';
 
 const EMIT_THROTTLE_MS = 80;
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.id as string;
 
   const [roomTitle, setRoomTitle] = useState('Interview Room');
-  const [token] = useState(() => localStorage.getItem('accessToken') ?? '');
-  const [username] = useState(() => localStorage.getItem('username') ?? 'Anonymous');
+  const [credentials] = useState<{ token: string; username: string }>(() => ({
+    token: typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '',
+    username: typeof window !== 'undefined' ? (localStorage.getItem('username') ?? 'Anonymous') : 'Anonymous',
+  }));
+
+  const { token, username } = credentials;
 
   const {
-    code, language, participants,
+    code, language,
     setCode, setLanguage, setParticipants, setConnected,
     addParticipant, removeParticipant, reset,
   } = useRoomStore();
 
   const lastEmitRef = useRef<number>(0);
+  const languageRef = useRef(language);
+  languageRef.current = language;
 
   useEffect(() => {
     const socket = getSocket(token, username);
 
-    socket.on('connect', () => {
+    function onConnect() {
       setConnected(true);
       socket.emit(SocketEvent.JOIN_ROOM, { roomId, userId: '', username });
-    });
+    }
 
-    socket.on('disconnect', () => setConnected(false));
+    function onDisconnect() {
+      setConnected(false);
+    }
 
-    socket.on(SocketEvent.PARTICIPANTS, ({ participants }: { participants: RoomUser[] }) => {
+    function onParticipants({ participants }: { participants: RoomUser[] }) {
       setParticipants(participants);
-    });
+    }
 
-    socket.on(SocketEvent.USER_JOINED, ({ user }: { user: RoomUser }) => {
+    function onUserJoined({ user }: { user: RoomUser }) {
       addParticipant(user);
-    });
+    }
 
-    socket.on(SocketEvent.USER_LEFT, ({ socketId }: { socketId: string }) => {
+    function onUserLeft({ socketId }: { socketId: string }) {
       removeParticipant(socketId);
-    });
+    }
 
-    socket.on(SocketEvent.CODE_UPDATE, ({ code: incoming, language: lang }: { code: string; language: string }) => {
+    function onCodeUpdate({ code: incoming, language: lang }: { code: string; language: string }) {
       setCode(incoming);
       setLanguage(lang);
-    });
+    }
 
-    socket.on(SocketEvent.LANGUAGE_UPDATE, ({ language: lang }: { language: string }) => {
+    function onLanguageUpdate({ language: lang }: { language: string }) {
       setLanguage(lang);
-    });
+    }
 
-    socket.on(SocketEvent.ROOM_SNAPSHOT, ({ code: snap, language: lang }: { code: string; language: string }) => {
+    function onSnapshot({ code: snap, language: lang }: { code: string; language: string }) {
       setCode(snap);
       setLanguage(lang);
-    });
+    }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/rooms/${roomId}`, {
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on(SocketEvent.PARTICIPANTS, onParticipants);
+    socket.on(SocketEvent.USER_JOINED, onUserJoined);
+    socket.on(SocketEvent.USER_LEFT, onUserLeft);
+    socket.on(SocketEvent.CODE_UPDATE, onCodeUpdate);
+    socket.on(SocketEvent.LANGUAGE_UPDATE, onLanguageUpdate);
+    socket.on(SocketEvent.ROOM_SNAPSHOT, onSnapshot);
+
+    if (socket.connected) {
+      onConnect();
+    }
+
+    fetch(`${API}/api/rooms/${roomId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.room?.title) setRoomTitle(data.room.title);
-      })
+      .then((data) => { if (data.room?.title) setRoomTitle(data.room.title); })
       .catch(() => null);
 
     return () => {
       socket.emit(SocketEvent.LEAVE_ROOM, { roomId });
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off(SocketEvent.PARTICIPANTS);
-      socket.off(SocketEvent.USER_JOINED);
-      socket.off(SocketEvent.USER_LEFT);
-      socket.off(SocketEvent.CODE_UPDATE);
-      socket.off(SocketEvent.LANGUAGE_UPDATE);
-      socket.off(SocketEvent.ROOM_SNAPSHOT);
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off(SocketEvent.PARTICIPANTS, onParticipants);
+      socket.off(SocketEvent.USER_JOINED, onUserJoined);
+      socket.off(SocketEvent.USER_LEFT, onUserLeft);
+      socket.off(SocketEvent.CODE_UPDATE, onCodeUpdate);
+      socket.off(SocketEvent.LANGUAGE_UPDATE, onLanguageUpdate);
+      socket.off(SocketEvent.ROOM_SNAPSHOT, onSnapshot);
       reset();
     };
   }, [roomId, token, username]);
@@ -97,19 +117,20 @@ export default function RoomPage() {
       lastEmitRef.current = now;
 
       const socket = getSocket(token, username);
-      const payload: CodePayload = { roomId, code: newCode, language };
+      const payload: CodePayload = { roomId, code: newCode, language: languageRef.current };
       socket.emit(SocketEvent.CODE_CHANGE, payload);
     },
-    [roomId, language, token, username, setCode]
+    [roomId, token, username, setCode]
   );
 
   const handleLanguageChange = useCallback(
     (lang: string) => {
+      setLanguage(lang);
       const socket = getSocket(token, username);
       const payload: LangPayload = { roomId, language: lang };
       socket.emit(SocketEvent.LANGUAGE_CHANGE, payload);
     },
-    [roomId, token, username]
+    [roomId, token, username, setLanguage]
   );
 
   return (
