@@ -14,16 +14,54 @@ enum Role {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  username     String         @unique
-  email        String         @unique
-  passwordHash String
-  role         Role           @default(CANDIDATE)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  refreshTokens RefreshToken[]
+  id              String             @id @default(cuid())
+  username        String             @unique
+  email           String             @unique
+  passwordHash    String
+  role            Role               @default(CANDIDATE)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  refreshTokens   RefreshToken[]
+  rooms           InterviewRoom[]
+  participations  RoomParticipant[]
 
   @@map("users")
+}
+
+model InterviewRoom {
+  id           String             @id @default(cuid())
+  title        String
+  createdBy    String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  host         User               @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  participants RoomParticipant[]
+  snapshots    RoomCodeSnapshot[]
+
+  @@map("interview_rooms")
+}
+
+model RoomParticipant {
+  id       String        @id @default(cuid())
+  roomId   String
+  userId   String
+  joinedAt DateTime      @default(now())
+  room     InterviewRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("room_participants")
+}
+
+model RoomCodeSnapshot {
+  id       String        @id @default(cuid())
+  roomId   String
+  language String
+  code     String
+  savedAt  DateTime      @default(now())
+  room     InterviewRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_code_snapshots")
 }
 
 model RefreshToken {

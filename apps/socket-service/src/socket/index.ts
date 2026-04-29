@@ -1,27 +1,17 @@
 import { Server, Socket } from 'socket.io';
-import { SocketEvent } from '@codeforge/shared-types';
+import { socketAuthMiddleware } from '../middleware/auth.middleware';
+import { registerRoomHandlers } from '../handlers/room.handler';
+import { registerCodeHandlers } from '../handlers/code.handler';
+import { registerCursorHandlers } from '../handlers/cursor.handler';
 
 export function registerSocketHandlers(io: Server): void {
+  io.use(socketAuthMiddleware);
+
   io.on('connection', (socket: Socket) => {
-    console.log(`[socket] client connected: ${socket.id}`);
+    console.log(`[socket] connected: ${socket.data.username} (${socket.id})`);
 
-    socket.on(SocketEvent.JOIN_ROOM, (roomId: string) => {
-      socket.join(roomId);
-      socket.to(roomId).emit(SocketEvent.USER_JOINED, { socketId: socket.id });
-      console.log(`[socket] ${socket.id} joined room ${roomId}`);
-    });
-
-    socket.on(SocketEvent.LEAVE_ROOM, (roomId: string) => {
-      socket.leave(roomId);
-      socket.to(roomId).emit(SocketEvent.USER_LEFT, { socketId: socket.id });
-    });
-
-    socket.on(SocketEvent.CODE_CHANGE, (payload: { roomId: string; code: string; language: string }) => {
-      socket.to(payload.roomId).emit(SocketEvent.CODE_CHANGE, payload);
-    });
-
-    socket.on('disconnect', () => {
-      console.log(`[socket] client disconnected: ${socket.id}`);
-    });
+    registerRoomHandlers(io, socket);
+    registerCodeHandlers(socket);
+    registerCursorHandlers(socket);
   });
 }

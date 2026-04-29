@@ -83,14 +83,50 @@ export interface SubmissionResult {
 // ─── Socket Events ───────────────────────────────────────────────────────────
 
 export enum SocketEvent {
-  JOIN_ROOM = 'join:room',
-  LEAVE_ROOM = 'leave:room',
-  USER_JOINED = 'user:joined',
-  USER_LEFT = 'user:left',
-  CODE_CHANGE = 'code:change',
+  JOIN_ROOM      = 'room:join',
+  LEAVE_ROOM     = 'room:leave',
+  USER_JOINED    = 'room:user_joined',
+  USER_LEFT      = 'room:user_left',
+  PARTICIPANTS   = 'room:participants',
+  CODE_CHANGE    = 'code:change',
+  CODE_UPDATE    = 'code:update',
   LANGUAGE_CHANGE = 'language:change',
+  LANGUAGE_UPDATE = 'language:update',
+  CURSOR_UPDATE  = 'cursor:update',
+  ROOM_SNAPSHOT  = 'room:snapshot',
   EXECUTION_STARTED = 'execution:started',
-  EXECUTION_RESULT = 'execution:result',
-  CURSOR_MOVE = 'cursor:move',
-  CHAT_MESSAGE = 'chat:message',
+  EXECUTION_RESULT  = 'execution:result',
+  CHAT_MESSAGE   = 'chat:message',
 }
+
+export interface RoomUser {
+  socketId: string;
+  userId: string;
+  username: string;
+}
+
+export interface JoinRoomPayload {
+  roomId: string;
+  userId: string;
+  username: string;
+}
+
+export interface CodePayload {
+  roomId: string;
+  code: string;
+  language: string;
+}
+
+export interface LangPayload {
+  roomId: string;
+  language: string;
+}
+
+export interface CursorPayload {
+  roomId: string;
+  userId: string;
+  username: string;
+  line: number;
+  column: number;
+}
+

@@ -2,11 +2,15 @@ import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
+import dotenv from 'dotenv';
 import { registerSocketHandlers } from './socket';
+import { env } from './config/env';
+
+dotenv.config();
 
 const app = express();
 
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: env.frontendUrl, credentials: true }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
@@ -17,7 +21,7 @@ const httpServer = createServer(app);
 
 export const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: env.frontendUrl,
     methods: ['GET', 'POST'],
     credentials: true,
   },
