@@ -4,9 +4,7 @@ import { QUEUE_NAME } from '../queue/queue.names';
 import { markProcessing, markCompleted, markFailed } from '../services/submission.service';
 import type { QueueJobPayload } from '@codeforge/shared-types';
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { executeCodeInSandbox } from '../sandbox/container.manager';
 
 async function processJob(job: Job<QueueJobPayload>): Promise<void> {
   const { submissionId, language, sourceCode } = job.data;
@@ -15,16 +13,13 @@ async function processJob(job: Job<QueueJobPayload>): Promise<void> {
 
   await markProcessing(submissionId);
 
-  await sleep(2500);
+  const result = await executeCodeInSandbox({
+    submissionId,
+    code: sourceCode,
+    language,
+  });
 
-  const stubResult = {
-    verdict: 'accepted',
-    stdout: `[simulation] Executed ${sourceCode.length} chars of ${language} code successfully.\nOutput: Hello from CodeForge!`,
-    stderr: '',
-    executionTimeMs: 2500,
-  };
-
-  await markCompleted(submissionId, stubResult);
+  await markCompleted(submissionId, result);
 
   console.log(`[worker] job ${job.id} completed for submission ${submissionId}`);
 }
