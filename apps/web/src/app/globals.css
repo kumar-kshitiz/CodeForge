@@ -728,3 +728,119 @@ body {
   .landing-nav { padding: 16px 20px; }
   .rooms-page { padding: 32px 20px; }
 }
+
+/* ─── Submit Panel ────────────────────────────────────────────────────────── */
+
+.submit-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.submit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.btn-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-run:hover:not(:disabled) { background: #059669; }
+.btn-run:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.exec-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 3px 8px;
+  background: var(--surface);
+  border-radius: 4px;
+}
+
+.verdict-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verdict-success {
+  color: #10b981;
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.25);
+}
+
+.verdict-fail {
+  color: #f87171;
+  background: rgba(248,113,113,0.12);
+  border: 1px solid rgba(248,113,113,0.25);
+}
+
+.output-error {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--red);
+  background: rgba(248,113,113,0.06);
+  border-top: 1px solid rgba(248,113,113,0.15);
+}
+
+.output-panel {
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.output-section { padding: 10px 16px; }
+
+.output-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+
+.output-label-err { color: var(--red); }
+
+.output-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.output-code-err { color: var(--red); }

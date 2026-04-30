@@ -13,6 +13,13 @@ enum Role {
   CANDIDATE
 }
 
+enum SubmissionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id              String             @id @default(cuid())
   username        String             @unique
@@ -24,8 +31,39 @@ model User {
   refreshTokens   RefreshToken[]
   rooms           InterviewRoom[]
   participations  RoomParticipant[]
+  submissions     Submission[]
 
   @@map("users")
+}
+
+model Problem {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  difficulty  String
+  starterCode Json
+  createdAt   DateTime     @default(now())
+  submissions Submission[]
+
+  @@map("problems")
+}
+
+model Submission {
+  id              String           @id @default(cuid())
+  userId          String
+  problemId       String?
+  language        String
+  sourceCode      String
+  status          SubmissionStatus @default(PENDING)
+  verdict         String?
+  stdout          String?
+  stderr          String?
+  executionTimeMs Int?
+  createdAt       DateTime         @default(now())
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem         Problem?         @relation(fields: [problemId], references: [id], onDelete: SetNull)
+
+  @@map("submissions")
 }
 
 model InterviewRoom {

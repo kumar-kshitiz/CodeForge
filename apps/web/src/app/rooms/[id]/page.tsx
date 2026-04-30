@@ -10,6 +10,7 @@ import RoomHeader from '../../../components/room/RoomHeader';
 import PresenceBar from '../../../components/room/PresenceBar';
 import LanguageSelector from '../../../components/room/LanguageSelector';
 import CodeEditor from '../../../components/editor/CodeEditor';
+import SubmitPanel from '../../../components/room/SubmitPanel';
 
 const EMIT_THROTTLE_MS = 80;
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -143,6 +144,7 @@ export default function RoomPage() {
       <div className="room-editor">
         <CodeEditor value={code} language={language} onChange={handleCodeChange} />
       </div>
+      <SubmitPanel code={code} language={language} />
     </div>
   );
 }

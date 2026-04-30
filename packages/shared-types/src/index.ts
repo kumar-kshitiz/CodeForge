@@ -48,6 +48,23 @@ export interface ProblemExample {
 
 export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' | 'cpp';
 
+export type SubmissionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface QueueJobPayload {
+  submissionId: string;
+  userId: string;
+  language: SupportedLanguage;
+  sourceCode: string;
+}
+
+export interface SubmissionResult {
+  verdict: string;
+  stdout: string;
+  stderr: string;
+  executionTimeMs: number;
+}
+
+
 export interface ExecutionJob {
   submissionId: string;
   roomId: string;
@@ -71,7 +88,7 @@ export interface ExecutionResult {
 
 export type Verdict = 'accepted' | 'wrong_answer' | 'time_limit_exceeded' | 'runtime_error' | 'compilation_error' | 'pending';
 
-export interface SubmissionResult {
+export interface JudgeResult {
   submissionId: string;
   verdict: Verdict;
   runtime: number;
