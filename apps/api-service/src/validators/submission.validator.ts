@@ -6,6 +6,7 @@ export const createSubmissionSchema = z.object({
   language: z.enum(SUPPORTED_LANGUAGES, { message: 'Unsupported language' }),
   sourceCode: z.string().min(1, 'Source code cannot be empty').max(50000),
   problemId: z.string().optional(),
+  roomId: z.string().optional(),
 });
 
 export const updateStatusSchema = z.object({

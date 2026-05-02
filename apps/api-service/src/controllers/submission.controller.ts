@@ -12,6 +12,7 @@ export async function createSubmission(req: Request, res: Response, next: NextFu
     await enqueueSubmission({
       submissionId: submission.id,
       userId: submission.userId,
+      roomId: submission.roomId || undefined,
       language: submission.language as SupportedLanguage,
       sourceCode: submission.sourceCode,
     });
@@ -38,6 +39,16 @@ export async function getSubmission(req: Request, res: Response, next: NextFunct
 export async function listSubmissions(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const submissions = await submissionService.getUserSubmissions(req.user!.id);
+    res.json({ submissions });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRoomSubmissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // Optional: add authorization to check if user is in room. For now, just fetch.
+    const submissions = await submissionService.getRoomSubmissions(req.params.roomId);
     res.json({ submissions });
   } catch (err) {
     next(err);

@@ -844,3 +844,89 @@ body {
 }
 
 .output-code-err { color: var(--red); }
+
+/* --- Submission History Panel --- */
+
+.history-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.history-list {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+
+.history-list h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.history-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+}
+
+.history-row:hover {
+  background: var(--bg-primary);
+  border-color: var(--border);
+}
+
+.history-row.active {
+  background: var(--primary-alpha);
+  border-color: var(--primary);
+}
+
+.history-col-verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.history-col-lang, .history-col-time {
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-dot.completed { background: var(--green); }
+.status-dot.failed { background: var(--red); }
+.status-dot.processing { background: var(--primary); animation: pulse 1.5s infinite; }
+.status-dot.pending { background: var(--text-muted); }
+
+.output-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}

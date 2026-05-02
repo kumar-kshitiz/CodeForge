@@ -53,6 +53,7 @@ export type SubmissionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 export interface QueueJobPayload {
   submissionId: string;
   userId: string;
+  roomId?: string;
   language: SupportedLanguage;
   sourceCode: string;
 }
@@ -113,6 +114,10 @@ export enum SocketEvent {
   ROOM_SNAPSHOT  = 'room:snapshot',
   EXECUTION_STARTED = 'execution:started',
   EXECUTION_RESULT  = 'execution:result',
+  SUBMISSION_QUEUED = 'submission:queued',
+  SUBMISSION_PROCESSING = 'submission:processing',
+  SUBMISSION_COMPLETED = 'submission:completed',
+  SUBMISSION_FAILED = 'submission:failed',
   CHAT_MESSAGE   = 'chat:message',
 }
 

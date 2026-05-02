@@ -52,6 +52,7 @@ model Submission {
   id              String           @id @default(cuid())
   userId          String
   problemId       String?
+  roomId          String?
   language        String
   sourceCode      String
   status          SubmissionStatus @default(PENDING)
@@ -62,6 +63,7 @@ model Submission {
   createdAt       DateTime         @default(now())
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem         Problem?         @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  room            InterviewRoom?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
 
   @@map("submissions")
 }
@@ -75,6 +77,7 @@ model InterviewRoom {
   host         User               @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   participants RoomParticipant[]
   snapshots    RoomCodeSnapshot[]
+  submissions  Submission[]
 
   @@map("interview_rooms")
 }
