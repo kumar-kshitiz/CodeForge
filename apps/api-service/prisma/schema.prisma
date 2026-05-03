@@ -32,20 +32,49 @@ model User {
   rooms           InterviewRoom[]
   participations  RoomParticipant[]
   submissions     Submission[]
+  drafts          CodeDraft[]
 
   @@map("users")
 }
 
 model Problem {
   id          String       @id @default(cuid())
+  slug        String       @unique
   title       String
   description String
   difficulty  String
   starterCode Json
+  constraints Json?
+  examples    Json?
   createdAt   DateTime     @default(now())
   submissions Submission[]
+  tags        ProblemTag[]
+  drafts      CodeDraft[]
 
   @@map("problems")
+}
+
+model ProblemTag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  problems Problem[]
+
+  @@map("problem_tags")
+}
+
+model CodeDraft {
+  id        String   @id @default(cuid())
+  userId    String
+  problemId String
+  language  String
+  code      String
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId, language])
+  @@map("code_drafts")
 }
 
 model Submission {
