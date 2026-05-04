@@ -12,6 +12,7 @@ export async function createSubmission(userId: string, input: CreateSubmissionIn
       sourceCode: input.sourceCode,
       problemId: input.problemId ?? null,
       roomId: input.roomId ?? null,
+      contestId: input.contestId ?? null,
       status: SubmissionStatus.PENDING,
     },
   });
@@ -79,6 +80,79 @@ export async function updateSubmissionStatus(id: string, input: UpdateStatusInpu
     }));
   }
 
+  if (submission.contestId && submission.problemId && (submission.status === 'COMPLETED' || submission.status === 'FAILED')) {
+    await handleContestSubmission(submission);
+  }
+
   return submission;
+}
+
+async function handleContestSubmission(submission: any) {
+  const contestId = submission.contestId!;
+  const problemId = submission.problemId!;
+  const userId = submission.userId;
+
+  const contest = await prisma.contest.findUnique({
+    where: { id: contestId },
+    include: { problems: true },
+  });
+  if (!contest) return;
+
+  const contestProblem = contest.problems.find(p => p.problemId === problemId);
+  if (!contestProblem) return;
+
+  const participant = await prisma.contestParticipant.findUnique({
+    where: { contestId_userId: { contestId, userId } }
+  });
+  if (!participant) return;
+
+  const prevAccepted = await prisma.contestSubmission.findFirst({
+    where: { contestId, problemId, submission: { userId }, pointsAwarded: { gt: 0 } }
+  });
+
+  if (prevAccepted) return; // Already solved
+
+  let pointsAwarded = 0;
+  let penaltyTime = 0;
+
+  if (submission.verdict === 'accepted') {
+    pointsAwarded = contestProblem.points;
+    const minutesElapsed = Math.floor((submission.createdAt.getTime() - contest.startTime.getTime()) / 60000);
+    
+    const wrongSubmissions = await prisma.submission.count({
+      where: {
+        contestId, problemId, userId, status: 'FAILED',
+        createdAt: { lt: submission.createdAt }
+      }
+    });
+
+    penaltyTime = minutesElapsed + (wrongSubmissions * 20);
+    
+    await prisma.contestParticipant.update({
+      where: { id: participant.id },
+      data: {
+        score: { increment: pointsAwarded },
+        penalty: { increment: penaltyTime }
+      }
+    });
+  }
+
+  await prisma.contestSubmission.create({
+    data: {
+      contestId, problemId, submissionId: submission.id, pointsAwarded, penaltyTime
+    }
+  });
+
+  // Broadcast Leaderboard Update to redis
+  const updatedParticipant = await prisma.contestParticipant.findUnique({
+    where: { id: participant.id },
+    include: { user: { select: { username: true } } }
+  });
+
+  redisPublisher.publish('execution-updates', JSON.stringify({
+    roomId: `contest-${contestId}`,
+    event: SocketEvent.CONTEST_LEADERBOARD_UPDATE,
+    payload: updatedParticipant
+  }));
 }
 

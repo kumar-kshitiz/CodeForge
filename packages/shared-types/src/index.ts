@@ -119,6 +119,7 @@ export enum SocketEvent {
   SUBMISSION_COMPLETED = 'submission:completed',
   SUBMISSION_FAILED = 'submission:failed',
   CHAT_MESSAGE   = 'chat:message',
+  CONTEST_LEADERBOARD_UPDATE = 'contest:leaderboard_update',
 }
 
 export interface RoomUser {

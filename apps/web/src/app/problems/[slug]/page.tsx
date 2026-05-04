@@ -26,8 +26,15 @@ function getToken(): string {
   return typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '';
 }
 
-export default function ProblemWorkspacePage({ params }: { params: Promise<{ slug: string }> }) {
+export default function ProblemWorkspacePage({ 
+  params, 
+  searchParams 
+}: { 
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ contestId?: string }>;
+}) {
   const { slug } = use(params);
+  const { contestId } = use(searchParams);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('');
@@ -115,7 +122,11 @@ export default function ProblemWorkspacePage({ params }: { params: Promise<{ slu
       {/* LEFT PANEL: Problem Details */}
       <div className="workspace-left">
         <div className="problem-header">
-          <Link href="/problems" className="back-link">← Back</Link>
+          {contestId ? (
+            <Link href={`/contests/${contestId}`} className="back-link">← Back to Contest</Link>
+          ) : (
+            <Link href="/problems" className="back-link">← Back</Link>
+          )}
           <h2>{problem.title}</h2>
           <div className="problem-meta">
             <span className={`diff-${problem.difficulty.toLowerCase()} badge`}>{problem.difficulty}</span>
@@ -186,7 +197,7 @@ export default function ProblemWorkspacePage({ params }: { params: Promise<{ slu
         </div>
 
         <div className="workspace-submit-wrapper">
-          <SubmitPanel code={code} language={language} />
+          <SubmitPanel code={code} language={language} problemId={problem.id} contestId={contestId} />
         </div>
       </div>
     </div>

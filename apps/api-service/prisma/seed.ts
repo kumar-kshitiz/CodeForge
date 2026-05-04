@@ -66,6 +66,27 @@ async function main() {
   });
 
   console.log({ twoSum, reverseString });
+
+  const now = new Date();
+  const contest = await prisma.contest.upsert({
+    where: { id: 'weekly-contest-1' },
+    update: {},
+    create: {
+      id: 'weekly-contest-1',
+      title: 'Weekly Contest 1',
+      description: 'Welcome to our first weekly contest! Solve these algorithmic challenges as quickly as possible.',
+      startTime: new Date(now.getTime() - 1000 * 60 * 30), // Started 30 mins ago
+      endTime: new Date(now.getTime() + 1000 * 60 * 90), // Ends in 90 mins
+      problems: {
+        create: [
+          { problemId: twoSum.id, points: 3 },
+          { problemId: reverseString.id, points: 4 },
+        ]
+      }
+    }
+  });
+
+  console.log({ contest });
 }
 
 main()

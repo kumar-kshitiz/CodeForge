@@ -8,6 +8,8 @@ import { SocketEvent } from '@codeforge/shared-types';
 interface SubmitPanelProps {
   code: string;
   language: string;
+  problemId?: string;
+  contestId?: string;
 }
 
 type Status = 'idle' | 'submitting' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
@@ -29,7 +31,7 @@ function getToken(): string {
   return typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '';
 }
 
-export default function SubmitPanel({ code, language }: SubmitPanelProps) {
+export default function SubmitPanel({ code, language, problemId, contestId }: SubmitPanelProps) {
   const roomId = useRoomStore((s) => s.roomId);
   const [status, setStatus] = useState<Status>('idle');
   const [history, setHistory] = useState<SubmissionHistory[]>([]);
@@ -111,7 +113,7 @@ export default function SubmitPanel({ code, language }: SubmitPanelProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ language, sourceCode: code, roomId }),
+        body: JSON.stringify({ language, sourceCode: code, roomId, problemId, contestId }),
       });
 
       if (!res.ok) {
