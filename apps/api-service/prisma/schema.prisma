@@ -98,8 +98,25 @@ model Submission {
   room            InterviewRoom?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
   contest         Contest?         @relation(fields: [contestId], references: [id], onDelete: SetNull)
   contestSubmission ContestSubmission?
+  feedback        SubmissionFeedback?
 
   @@map("submissions")
+}
+
+model SubmissionFeedback {
+  id                 String     @id @default(cuid())
+  submissionId       String     @unique
+  summary            String
+  strengths          Json
+  weaknesses         Json
+  optimizations      Json
+  complexityEstimate String
+  readabilityScore   Int
+  createdAt          DateTime   @default(now())
+
+  submission         Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@map("submission_feedbacks")
 }
 
 model InterviewRoom {

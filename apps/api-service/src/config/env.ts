@@ -10,6 +10,7 @@ export const env = {
   databaseUrl: requireEnv('DATABASE_URL'),
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  openaiApiKey: process.env.OPENAI_API_KEY,
   jwt: {
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),

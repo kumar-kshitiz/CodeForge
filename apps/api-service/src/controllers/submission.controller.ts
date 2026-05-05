@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { createSubmissionSchema, updateStatusSchema } from '../validators/submission.validator';
 import * as submissionService from '../services/submission.service';
+import * as aiService from '../services/ai.service';
 import { enqueueSubmission } from '../queue/producer';
 import type { SupportedLanguage } from '@codeforge/shared-types';
 
@@ -65,6 +66,15 @@ export async function updateStatus(req: Request, res: Response, next: NextFuncti
     const input = updateStatusSchema.parse(req.body);
     const submission = await submissionService.updateSubmissionStatus(req.params.id, input);
     res.json({ submission });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getFeedback(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const feedback = await aiService.generateFeedback(req.params.id);
+    res.json({ feedback });
   } catch (err) {
     next(err);
   }

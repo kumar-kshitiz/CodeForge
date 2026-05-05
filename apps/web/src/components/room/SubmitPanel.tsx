@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRoomStore } from '@/store/roomStore';
 import { getSocket } from '@/lib/socket';
 import { SocketEvent } from '@codeforge/shared-types';
+import AiFeedbackPanel from '../ai-feedback/AiFeedbackPanel';
 
 interface SubmitPanelProps {
   code: string;
@@ -181,6 +182,12 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
               <div className="output-section">
                 <div className="output-label output-label-err">stderr</div>
                 <pre className="output-code output-code-err">{activeSubmission.stderr}</pre>
+              </div>
+            )}
+
+            {(activeSubmission.status === 'COMPLETED' || activeSubmission.status === 'FAILED') && (
+              <div style={{ marginTop: '24px' }}>
+                <AiFeedbackPanel submissionId={activeSubmission.id} />
               </div>
             )}
           </div>
