@@ -59,7 +59,9 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
 
   // Socket Listeners for Realtime Updates
   useEffect(() => {
-    const socket = getSocket();
+    const token = getToken();
+    const username = typeof window !== 'undefined' ? localStorage.getItem('username') || 'Anonymous' : 'Anonymous';
+    const socket = getSocket(token, username);
     if (!socket) return;
 
     const handleUpdate = (payload: any) => {

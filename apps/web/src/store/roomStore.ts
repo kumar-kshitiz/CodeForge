@@ -11,7 +11,7 @@ interface RoomState {
   connected: boolean;
   remoteCursors: Map<string, { line: number; column: number; username: string }>;
 
-  setRoomId: (id: string) => void;
+  setRoomId: (id: string | null) => void;
   setParticipants: (users: RoomUser[]) => void;
   setCode: (code: string) => void;
   setLanguage: (lang: string) => void;

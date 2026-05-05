@@ -51,7 +51,9 @@ export default function ProblemWorkspacePage({
     const sessionId = `problem-${slug}-${Date.now()}`;
     setRoomId(sessionId);
 
-    const socket = getSocket();
+    const token = getToken();
+    const username = typeof window !== 'undefined' ? localStorage.getItem('username') || 'Anonymous' : 'Anonymous';
+    const socket = getSocket(token, username);
     if (socket) {
       socket.emit(SocketEvent.JOIN_ROOM, { roomId: sessionId });
     }

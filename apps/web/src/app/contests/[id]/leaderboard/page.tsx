@@ -37,7 +37,11 @@ export default function LeaderboardPage({ params }: { params: Promise<{ id: stri
   }, [id]);
 
   useEffect(() => {
-    const socket = getSocket();
+    const token = getToken();
+    // Assuming username might be available or we can use a fallback
+    const username = typeof window !== 'undefined' ? localStorage.getItem('username') || 'Anonymous' : 'Anonymous';
+    
+    const socket = getSocket(token, username);
     if (!socket) return;
 
     // Join a specific contest room to listen for leaderboard updates
