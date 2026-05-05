@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../../store/authStore';
 
 interface Room {
   id: string;
@@ -14,6 +15,8 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function RoomsPage() {
   const router = useRouter();
+  const { token, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -21,14 +24,11 @@ export default function RoomsPage() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
 
-  function getToken(): string {
-    return typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '';
-  }
-
   const fetchRooms = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${API}/api/rooms`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setRooms(data.rooms ?? []);
@@ -37,15 +37,19 @@ export default function RoomsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    fetchRooms();
-  }, [fetchRooms]);
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    } else if (isAuthenticated) {
+      fetchRooms();
+    }
+  }, [authLoading, isAuthenticated, router, fetchRooms]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !token) return;
     setCreating(true);
     setError('');
 
@@ -54,7 +58,7 @@ export default function RoomsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ title: title.trim() }),
       });
@@ -72,6 +76,10 @@ export default function RoomsPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  if (authLoading || (!isAuthenticated && !authLoading)) {
+    return <div className="rooms-loading"><div className="room-skeleton" /></div>;
   }
 
   return (

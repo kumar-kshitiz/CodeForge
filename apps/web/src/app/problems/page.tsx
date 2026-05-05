@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../../store/authStore';
 
 interface Problem {
   id: string;
@@ -14,13 +16,23 @@ interface Problem {
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function ProblemsPage() {
+  const router = useRouter();
+  const { token, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!token) return;
+
     fetch(`${API}/api/problems`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`
+        Authorization: `Bearer ${token}`
       }
     })
       .then(res => res.json())
@@ -30,7 +42,12 @@ export default function ProblemsPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [authLoading, isAuthenticated, token, router]);
+
+  if (authLoading || (!isAuthenticated && !authLoading)) {
+    return <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>;
+  }
+
 
   return (
     <div className="container">

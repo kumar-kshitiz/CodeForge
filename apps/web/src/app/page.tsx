@@ -1,23 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../store/authStore';
 
 export default function Home() {
   const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
   return (
     <div className="landing">
-      <nav className="landing-nav">
-        <div className="nav-logo">CF</div>
-        <div className="nav-links">
-          <button className="btn-ghost-sm" onClick={() => router.push('/rooms')}>
-            Rooms
-          </button>
-          <button className="btn-primary-sm" onClick={() => router.push('/rooms')}>
-            Get Started
-          </button>
-        </div>
-      </nav>
 
       <main className="landing-hero">
         <div className="hero-glow" />
@@ -32,9 +23,15 @@ export default function Home() {
             Powered by Socket.IO, Monaco, and Redis.
           </p>
           <div className="hero-actions">
-            <button className="btn-primary-lg" onClick={() => router.push('/rooms')}>
-              Open Interview Rooms
-            </button>
+            {!isLoading && isAuthenticated ? (
+              <button className="btn-primary-lg" onClick={() => router.push('/rooms')}>
+                Open Interview Rooms
+              </button>
+            ) : (
+              <button className="btn-primary-lg" onClick={() => router.push('/register')}>
+                Get Started
+              </button>
+            )}
           </div>
         </div>
 

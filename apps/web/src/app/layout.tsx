@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import Navbar from '../components/common/Navbar';
+import AuthInitializer from '../components/common/AuthInitializer';
 
 export const metadata: Metadata = {
   title: 'CodeForge — Collaborative Interview Rooms',
@@ -17,8 +19,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthInitializer />
+        <Navbar />
+        <main className="layout-main">
+          {children}
+        </main>
+      </body>
     </html>
   );
 }
-

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuthStore } from '../../../store/authStore';
 import { SocketEvent } from '@codeforge/shared-types';
 import type { RoomUser, CodePayload, LangPayload } from '@codeforge/shared-types';
 import { getSocket } from '../../../lib/socket';
@@ -20,12 +21,15 @@ export default function RoomPage() {
   const roomId = params.id as string;
 
   const [roomTitle, setRoomTitle] = useState('Interview Room');
-  const [credentials] = useState<{ token: string; username: string }>(() => ({
-    token: typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '',
-    username: typeof window !== 'undefined' ? (localStorage.getItem('username') ?? 'Anonymous') : 'Anonymous',
-  }));
+  const router = useRouter();
+  const { token, user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const username = user?.username ?? 'Anonymous';
 
-  const { token, username } = credentials;
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   const {
     code, language,
@@ -38,6 +42,7 @@ export default function RoomPage() {
   languageRef.current = language;
 
   useEffect(() => {
+    if (!token) return;
     const socket = getSocket(token, username);
 
     function onConnect() {
@@ -117,6 +122,7 @@ export default function RoomPage() {
       if (now - lastEmitRef.current < EMIT_THROTTLE_MS) return;
       lastEmitRef.current = now;
 
+      if (!token) return;
       const socket = getSocket(token, username);
       const payload: CodePayload = { roomId, code: newCode, language: languageRef.current };
       socket.emit(SocketEvent.CODE_CHANGE, payload);
@@ -127,12 +133,17 @@ export default function RoomPage() {
   const handleLanguageChange = useCallback(
     (lang: string) => {
       setLanguage(lang);
+      if (!token) return;
       const socket = getSocket(token, username);
       const payload: LangPayload = { roomId, language: lang };
       socket.emit(SocketEvent.LANGUAGE_CHANGE, payload);
     },
     [roomId, token, username, setLanguage]
   );
+
+  if (authLoading || (!isAuthenticated && !authLoading)) {
+    return <div className="rooms-loading"><div className="room-skeleton" /></div>;
+  }
 
   return (
     <div className="room-layout">

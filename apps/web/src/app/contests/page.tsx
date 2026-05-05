@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '../../store/authStore';
 
 interface Contest {
   id: string;
@@ -16,19 +18,34 @@ interface Contest {
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function ContestsPage() {
+  const router = useRouter();
+  const { token, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
   const [contests, setContests] = useState<Contest[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!token) return;
+
     fetch(`${API}/api/contests`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+      headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
       .then(data => {
         if (data.contests) setContests(data.contests);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [authLoading, isAuthenticated, token, router]);
+
+  if (authLoading || (!isAuthenticated && !authLoading)) {
+    return <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>;
+  }
+
 
   const getStatusColor = (status: string) => {
     if (status === 'ACTIVE') return 'var(--green)';
