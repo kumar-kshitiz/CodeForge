@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { SocketEvent, RoomUser } from '@codeforge/shared-types';
 import { addUserToRoom, removeUserFromRoom, getRoomUsers, getRoomCode } from '../services/room.service';
+import { SessionRecordingService } from '../services/recording.service';
 import { cancelDebounce } from '../utils/debounce';
 
 export function registerRoomHandlers(io: Server, socket: Socket): void {
@@ -30,6 +31,8 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
     socket.to(roomId).emit(SocketEvent.USER_JOINED, { user });
     socket.to(roomId).emit(SocketEvent.PARTICIPANTS, { participants });
 
+    SessionRecordingService.recordEvent(roomId, SocketEvent.USER_JOINED, socket.data.userId, { user });
+
     console.log(`[room] ${user.username} joined ${roomId}`);
   });
 
@@ -42,6 +45,8 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
     const participants = await getRoomUsers(roomId);
     socket.to(roomId).emit(SocketEvent.USER_LEFT, { socketId: socket.id, userId: socket.data.userId });
     socket.to(roomId).emit(SocketEvent.PARTICIPANTS, { participants });
+
+    SessionRecordingService.recordEvent(roomId, SocketEvent.USER_LEFT, socket.data.userId, { socketId: socket.id });
   });
 
   socket.on('disconnect', async () => {
@@ -52,6 +57,8 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
         const participants = await getRoomUsers(roomId);
         socket.to(roomId).emit(SocketEvent.USER_LEFT, { socketId: socket.id, userId: socket.data.userId });
         socket.to(roomId).emit(SocketEvent.PARTICIPANTS, { participants });
+
+        SessionRecordingService.recordEvent(roomId, SocketEvent.USER_LEFT, socket.data.userId, { socketId: socket.id });
       })
     );
     joinedRooms.clear();

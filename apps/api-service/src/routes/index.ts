@@ -5,6 +5,7 @@ import roomRouter from './room.routes';
 import submissionRouter from './submission.routes';
 import problemRouter from './problem.routes';
 import contestRouter from './contest.routes';
+import replayRouter from './replay.routes';
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.use('/rooms', roomRouter);
 router.use('/submissions', submissionRouter);
 router.use('/problems', problemRouter);
 router.use('/contests', contestRouter);
+router.use('/replays', replayRouter);
 
 export default router;
 

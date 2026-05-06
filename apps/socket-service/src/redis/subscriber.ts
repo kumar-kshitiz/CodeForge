@@ -19,6 +19,9 @@ export function initializeRedisSubscriber(io: Server) {
         const { roomId, event, payload } = JSON.parse(message);
         if (roomId && event) {
           io.to(roomId).emit(event, payload);
+          // Import inline to avoid circular dependencies if any, or just import at top
+          const { SessionRecordingService } = require('../services/recording.service');
+          SessionRecordingService.recordEvent(roomId, event, payload?.userId || 'system', payload);
         }
       } catch (err) {
         console.error('[redis] failed to parse message:', err);
