@@ -16,6 +16,10 @@ export const updateStatusSchema = z.object({
   stdout: z.string().optional(),
   stderr: z.string().optional(),
   executionTimeMs: z.number().int().optional(),
+  memory: z.string().optional(),
+  passedTestCases: z.number().int().optional(),
+  totalTestCases: z.number().int().optional(),
+  failedTestCase: z.any().optional(),
 });
 
 export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;

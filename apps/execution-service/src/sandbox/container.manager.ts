@@ -1,14 +1,16 @@
-import type { SubmissionResult } from '@codeforge/shared-types';
+import type { SubmissionResult, TestCasePayload } from '@codeforge/shared-types';
 import { RunnerFactory } from '../runners/runner.factory';
 
 export interface ExecuteOptions {
   submissionId: string;
   code: string;
   language: string;
+  problemSlug?: string;
+  testCases?: TestCasePayload[];
 }
 
 export async function executeCodeInSandbox(options: ExecuteOptions): Promise<SubmissionResult> {
-  const { submissionId, code, language } = options;
+  const { submissionId, code, language, problemSlug, testCases } = options;
 
   try {
     const runner = RunnerFactory.getRunner(language);
@@ -16,7 +18,9 @@ export async function executeCodeInSandbox(options: ExecuteOptions): Promise<Sub
     // The runner (via BaseRunner) handles workspace creation, timeout, and cleanup
     const result = await runner.execute({
       submissionId,
-      code
+      code,
+      problemSlug,
+      testCases
     });
 
     return result as SubmissionResult;

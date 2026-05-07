@@ -52,6 +52,7 @@ model Problem {
   tags        ProblemTag[]
   drafts      CodeDraft[]
   contestProblems ContestProblem[]
+  testCases   TestCase[]
 
   @@map("problems")
 }
@@ -62,6 +63,20 @@ model ProblemTag {
   problems Problem[]
 
   @@map("problem_tags")
+}
+
+model TestCase {
+  id             String   @id @default(cuid())
+  problemId      String
+  input          String   @db.Text
+  expectedOutput String   @db.Text
+  isHidden       Boolean  @default(false)
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@map("test_cases")
 }
 
 model CodeDraft {
@@ -92,6 +107,10 @@ model Submission {
   stdout          String?
   stderr          String?
   executionTimeMs Int?
+  memory          String?
+  passedTestCases Int?
+  totalTestCases  Int?
+  failedTestCase  Json?
   createdAt       DateTime         @default(now())
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem         Problem?         @relation(fields: [problemId], references: [id], onDelete: SetNull)

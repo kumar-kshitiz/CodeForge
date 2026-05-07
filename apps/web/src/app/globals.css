@@ -937,7 +937,7 @@ body {
 
 .history-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 13px;
@@ -964,7 +964,7 @@ body {
   font-weight: 500;
 }
 
-.history-col-lang, .history-col-time {
+.history-col-lang, .history-col-time, .history-col-testcases {
   color: var(--text-muted);
   text-align: right;
 }
@@ -986,6 +986,73 @@ body {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.testcase-ratio {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.failed-testcase-container {
+  margin: 16px;
+  padding: 16px;
+  background: rgba(248,113,113,0.04);
+  border: 1px solid rgba(248,113,113,0.15);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.failed-testcase-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.testcase-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.testcase-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.testcase-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-tertiary);
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.testcase-expected {
+  background: rgba(16,185,129,0.05);
+  border-color: rgba(16,185,129,0.2);
+}
+
+.testcase-actual {
+  background: rgba(248,113,113,0.05);
+  border-color: rgba(248,113,113,0.2);
 }
 
 /* --- Coding Workspace --- */

@@ -1,15 +1,14 @@
 import type { SubmissionStatus } from '@codeforge/shared-types';
 
-export interface RunnerResult {
-  verdict: string;
-  stdout: string;
-  stderr: string;
-  executionTimeMs: number;
-}
+import type { SubmissionResult, TestCasePayload } from '@codeforge/shared-types';
+
+export interface RunnerResult extends Omit<SubmissionResult, 'submissionId'> {}
 
 export interface RunnerOptions {
   submissionId: string;
   code: string;
+  problemSlug?: string;
+  testCases?: TestCasePayload[];
 }
 
 export interface LanguageRunner {

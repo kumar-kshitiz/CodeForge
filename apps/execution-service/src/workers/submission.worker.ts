@@ -7,9 +7,9 @@ import type { QueueJobPayload } from '@codeforge/shared-types';
 import { executeCodeInSandbox } from '../sandbox/container.manager';
 
 async function processJob(job: Job<QueueJobPayload>): Promise<void> {
-  const { submissionId, language, sourceCode } = job.data;
+  const { submissionId, language, sourceCode, problemSlug, testCases } = job.data;
 
-  console.log(`[worker] job ${job.id} | lang=${language} | submission=${submissionId}`);
+  console.log(`[worker] job ${job.id} | lang=${language} | submission=${submissionId} | slug=${problemSlug} | testcases=${testCases?.length || 0}`);
 
   await markProcessing(submissionId);
 
@@ -17,6 +17,8 @@ async function processJob(job: Job<QueueJobPayload>): Promise<void> {
     submissionId,
     code: sourceCode,
     language,
+    problemSlug,
+    testCases,
   });
 
   await markCompleted(submissionId, result);

@@ -5,6 +5,6 @@ export class PythonRunner extends BaseRunner {
   readonly image = 'python:3.9-alpine';
 
   protected getExecutionCommand(): string {
-    return `python3 /workspace/source.${this.extension}`;
+    return `sh -c "python3 /workspace/source.${this.extension} < /workspace/input.txt"`;
   }
 }

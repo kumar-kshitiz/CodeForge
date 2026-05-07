@@ -10,7 +10,17 @@ const app: Application = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  // origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., curl, mobile apps)
+    if (!origin) return callback(null, true);
+    // Allow any localhost port in development
+    if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+    // Allow the configured frontend URL in production
+    const allowed = process.env.FRONTEND_URL || 'http://localhost:3000';
+    if (origin === allowed) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
 }));
 app.use(express.json());

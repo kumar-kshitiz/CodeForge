@@ -4,11 +4,30 @@ import * as submissionService from '../services/submission.service';
 import * as aiService from '../services/ai.service';
 import { enqueueSubmission } from '../queue/producer';
 import type { SupportedLanguage } from '@codeforge/shared-types';
+import { prisma } from '../prisma/client';
 
 export async function createSubmission(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const input = createSubmissionSchema.parse(req.body);
     const submission = await submissionService.createSubmission(req.user!.id, input);
+
+    let problemSlug: string | undefined;
+    let testCases: { input: string; expectedOutput: string; isHidden: boolean }[] | undefined;
+    
+    if (submission.problemId) {
+      const problem = await prisma.problem.findUnique({ 
+        where: { id: submission.problemId },
+        include: { testCases: { orderBy: { order: 'asc' } } }
+      });
+      if (problem) {
+        problemSlug = problem.slug;
+        testCases = problem.testCases.map(tc => ({
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          isHidden: tc.isHidden
+        }));
+      }
+    }
 
     await enqueueSubmission({
       submissionId: submission.id,
@@ -16,6 +35,8 @@ export async function createSubmission(req: Request, res: Response, next: NextFu
       roomId: submission.roomId || undefined,
       language: submission.language as SupportedLanguage,
       sourceCode: submission.sourceCode,
+      problemSlug,
+      testCases,
     });
 
     res.status(201).json({ submission });

@@ -50,19 +50,37 @@ export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' 
 
 export type SubmissionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
+export interface TestCasePayload {
+  input: string;
+  expectedOutput: string;
+  isHidden: boolean;
+}
+
 export interface QueueJobPayload {
   submissionId: string;
   userId: string;
   roomId?: string;
   language: SupportedLanguage;
   sourceCode: string;
+  problemSlug?: string;
+  testCases?: TestCasePayload[];
+}
+
+export interface FailedTestCase {
+  input: string;
+  expected: string;
+  actual: string;
 }
 
 export interface SubmissionResult {
-  verdict: string;
+  verdict: Verdict;
   stdout: string;
   stderr: string;
   executionTimeMs: number;
+  memoryUsed?: string;
+  passedTestCases?: number;
+  totalTestCases?: number;
+  failedTestCase?: FailedTestCase;
 }
 
 

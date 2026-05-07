@@ -5,6 +5,6 @@ export class JavascriptRunner extends BaseRunner {
   readonly image = 'node:18-alpine';
 
   protected getExecutionCommand(): string {
-    return `node /workspace/source.${this.extension}`;
+    return `sh -c "node /workspace/source.${this.extension} < /workspace/input.txt"`;
   }
 }

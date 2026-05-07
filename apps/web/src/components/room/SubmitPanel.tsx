@@ -24,6 +24,9 @@ export interface SubmissionHistory {
   createdAt: string;
   stdout: string | null;
   stderr: string | null;
+  passedTestCases?: number | null;
+  totalTestCases?: number | null;
+  failedTestCase?: { input: string; expected: string; actual: string } | null;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -104,19 +107,24 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
   }, [status]);
 
   async function handleSubmit() {
-    if (!code.trim() || !roomId) return;
+    if (!code.trim()) return;
 
     setStatus('submitting');
     setError('');
 
     try {
+      // Fake rooms start with 'problem-' and aren't in the DB.
+      // We omit them so Prisma doesn't throw a foreign key constraint error.
+      const dbRoomId = roomId?.startsWith('problem-') ? undefined : roomId;
+
       const res = await fetch(`${API}/api/submissions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ language, sourceCode: code, roomId, problemId, contestId }),
+        // roomId is optional — null is fine for solo problem workspace
+        body: JSON.stringify({ language, sourceCode: code, roomId: dbRoomId, problemId, contestId }),
       });
 
       if (!res.ok) {
@@ -131,10 +139,47 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
       setHistory((prev) => [data.submission, ...prev]);
       setStatus('PENDING');
 
+      // Poll for result if no socket feedback arrives within 15s
+      pollSubmissionStatus(data.submission.id);
+
     } catch {
-      setError('Network error');
+      setError('Network error — is the API server running?');
       setStatus('idle');
     }
+  }
+
+  async function pollSubmissionStatus(submissionId: string) {
+    const maxAttempts = 30; // 30 × 1s = 30s max
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch(`${API}/api/submissions/${submissionId}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        const sub = data.submission;
+        if (sub && (sub.status === 'COMPLETED' || sub.status === 'FAILED')) {
+          clearInterval(interval);
+          setActiveSubmission(sub);
+          setHistory((prev) => {
+            const index = prev.findIndex((s) => s.id === sub.id);
+            if (index > -1) {
+              const newHistory = [...prev];
+              newHistory[index] = sub;
+              return newHistory;
+            }
+            return [sub, ...prev];
+          });
+          setStatus('idle');
+        }
+      } catch { /* ignore poll errors */ }
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        setStatus('idle');
+        setError('Execution timed out. Please try again.');
+      }
+    }, 1000);
   }
 
   const isRunning = status === 'submitting' || status === 'PENDING' || status === 'PROCESSING';
@@ -142,7 +187,7 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
   return (
     <div className="submit-panel">
       <div className="submit-toolbar">
-        <button className="btn-run" onClick={handleSubmit} disabled={isRunning || !roomId}>
+        <button className="btn-run" onClick={handleSubmit} disabled={isRunning}>
           {isRunning ? (
             <>
               <span className="spinner" />
@@ -172,7 +217,30 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
               {activeSubmission.executionTimeMs != null && (
                 <span className="exec-time">{activeSubmission.executionTimeMs}ms</span>
               )}
+              {activeSubmission.totalTestCases != null && activeSubmission.totalTestCases > 0 && (
+                <span className="testcase-ratio">
+                  Passed {activeSubmission.passedTestCases} / {activeSubmission.totalTestCases}
+                </span>
+              )}
             </div>
+
+            {activeSubmission.failedTestCase && (
+              <div className="failed-testcase-container">
+                <div className="failed-testcase-title">Testcase Failed</div>
+                <div className="testcase-row">
+                  <div className="testcase-label">Input</div>
+                  <pre className="testcase-value">{activeSubmission.failedTestCase.input}</pre>
+                </div>
+                <div className="testcase-row">
+                  <div className="testcase-label">Expected Output</div>
+                  <pre className="testcase-value testcase-expected">{activeSubmission.failedTestCase.expected}</pre>
+                </div>
+                <div className="testcase-row">
+                  <div className="testcase-label">Actual Output</div>
+                  <pre className="testcase-value testcase-actual">{activeSubmission.failedTestCase.actual}</pre>
+                </div>
+              </div>
+            )}
 
             {activeSubmission.stdout && (
               <div className="output-section">
@@ -211,7 +279,12 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
                     {sub.verdict || sub.status}
                   </div>
                   <div className="history-col-lang">{sub.language}</div>
-                  <div className="history-col-time">{sub.executionTimeMs ? `${sub.executionTimeMs}ms` : '-'}</div>
+                  <div className="history-col-time">
+                    {sub.executionTimeMs ? `${sub.executionTimeMs}ms` : '-'}
+                  </div>
+                  <div className="history-col-testcases">
+                    {sub.totalTestCases ? `${sub.passedTestCases}/${sub.totalTestCases}` : '-'}
+                  </div>
                 </div>
               ))}
             </div>

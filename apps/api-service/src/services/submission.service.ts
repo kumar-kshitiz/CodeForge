@@ -65,6 +65,10 @@ export async function updateSubmissionStatus(id: string, input: UpdateStatusInpu
       stdout: input.stdout,
       stderr: input.stderr,
       executionTimeMs: input.executionTimeMs,
+      memory: input.memory,
+      passedTestCases: input.passedTestCases,
+      totalTestCases: input.totalTestCases,
+      failedTestCase: input.failedTestCase ? input.failedTestCase : undefined,
     },
   });
 

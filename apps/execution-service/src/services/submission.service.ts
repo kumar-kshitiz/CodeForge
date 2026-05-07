@@ -18,6 +18,10 @@ export async function markCompleted(submissionId: string, result: SubmissionResu
     stdout: result.stdout,
     stderr: result.stderr,
     executionTimeMs: result.executionTimeMs,
+    memory: result.memoryUsed,
+    passedTestCases: result.passedTestCases,
+    totalTestCases: result.totalTestCases,
+    failedTestCase: result.failedTestCase,
   });
 }
 

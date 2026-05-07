@@ -5,7 +5,7 @@ export const SANDBOX_CONFIG = {
   CPUS: '0.5',
   
   // Execution constraints
-  TIMEOUT_MS: 5000,
+  TIMEOUT_MS: 15000,
   
   // Workspace paths
   BASE_WORKSPACE_DIR: '/tmp/codeforge-sandbox',
