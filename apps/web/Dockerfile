@@ -1,8 +1,7 @@
-FROM node:18-alpine AS base
+FROM node:20 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json turbo.json ./
 COPY apps/web/package.json ./apps/web/
