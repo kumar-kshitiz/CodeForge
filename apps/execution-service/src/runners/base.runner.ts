@@ -3,6 +3,10 @@ import { SANDBOX_CONFIG } from '../config/sandbox.config';
 import { createWorkspace, cleanupWorkspace } from '../sandbox/workspace.util';
 import type { LanguageRunner, RunnerOptions, RunnerResult } from './runner.interface';
 import { DriverInjector } from './drivers/driver.injector';
+import { InstrumentationEngine } from '../instrumentation/engine';
+import { TraceParser } from '../instrumentation/parser';
+import { TraceCollector } from '../instrumentation/collector';
+import { RuntimeAnalyzer } from '../instrumentation/analysis/analyzer';
 
 export abstract class BaseRunner implements LanguageRunner {
   abstract readonly extension: string;
@@ -30,30 +34,60 @@ export abstract class BaseRunner implements LanguageRunner {
 
     try {
       const result = await Promise.race([dockerPromise, timeoutPromise]);
-      const executionTimeMs = Date.now() - startTime;
+      let executionTimeMs = Date.now() - startTime;
+      // Deduct Docker overhead (~350ms) to approximate true execution time like an IDE
+      executionTimeMs = Math.max(1, executionTimeMs - 350);
+
+      // Parse Traces
+      const lineOffset = InstrumentationEngine.getInjectionOffset(this.extension);
+      const parsed = TraceParser.parse(result.stderr, result.stdout, lineOffset);
+      const traceData = TraceCollector.processTraces(parsed.traces);
+      const intelligence = RuntimeAnalyzer.analyze(traceData.snapshot, parsed.cleanedStderr, null);
 
       return {
         verdict: 'accepted',
-        stdout: result.stdout,
-        stderr: result.stderr,
+        stdout: parsed.cleanedStdout,
+        stderr: parsed.cleanedStderr,
         executionTimeMs,
+        snapshot: traceData.snapshot,
+        runtimeIntelligence: intelligence,
       };
     } catch (err: any) {
+      let executionTimeMs = Date.now() - startTime;
+      executionTimeMs = Math.max(1, executionTimeMs - 350);
+
+      // For errors, we also want to parse traces to see what happened before crash
+      const lineOffset = InstrumentationEngine.getInjectionOffset(this.extension);
+      const parsed = TraceParser.parse(err.stderr || err.message, err.stdout || '', lineOffset);
+      const traceData = TraceCollector.processTraces(parsed.traces);
+      
+      let exitSignal: string | null = null;
+      if (err.message === 'TIMEOUT') exitSignal = 'TIMEOUT';
+      // In a real docker run, err might contain the exit code or signal (e.g. err.code === 139)
+      if (err.code === 139) exitSignal = 'SIGSEGV';
+      if (err.code === 136) exitSignal = 'SIGFPE';
+
+      const intelligence = RuntimeAnalyzer.analyze(traceData.snapshot, parsed.cleanedStderr, exitSignal);
+
       if (err.message === 'TIMEOUT') {
         await killDockerContainer(containerName);
         return {
           verdict: 'time_limit_exceeded',
-          stdout: '',
-          stderr: `Execution exceeded ${SANDBOX_CONFIG.TIMEOUT_MS}ms.`,
+          stdout: parsed.cleanedStdout,
+          stderr: parsed.cleanedStderr + `\nExecution exceeded ${SANDBOX_CONFIG.TIMEOUT_MS}ms.`,
           executionTimeMs: SANDBOX_CONFIG.TIMEOUT_MS,
+          snapshot: traceData.snapshot,
+          runtimeIntelligence: intelligence,
         };
       }
 
       return {
         verdict: 'runtime_error',
-        stdout: err.stdout || '',
-        stderr: err.stderr || err.message,
-        executionTimeMs: Date.now() - startTime,
+        stdout: parsed.cleanedStdout,
+        stderr: parsed.cleanedStderr,
+        executionTimeMs,
+        snapshot: traceData.snapshot,
+        runtimeIntelligence: intelligence,
       };
     }
   }
@@ -62,7 +96,12 @@ export abstract class BaseRunner implements LanguageRunner {
 
   protected preprocessCode(code: string, problemSlug?: string): string {
     const lang = this.extension === 'py' ? 'python' : this.extension === 'js' ? 'javascript' : 'cpp';
-    return DriverInjector.inject(code, lang, problemSlug);
+    
+    // 1. Inject instrumentation logic
+    const instrumentedCode = InstrumentationEngine.instrument(code, lang);
+    
+    // 2. Inject I/O drivers
+    return DriverInjector.inject(instrumentedCode, lang, problemSlug);
   }
 
   protected async compile(workspaceDir: string, submissionId: string): Promise<RunnerResult | null> {
@@ -93,6 +132,8 @@ export abstract class BaseRunner implements LanguageRunner {
           stdout: result.stdout,
           stderr: result.stderr,
           executionTimeMs: result.executionTimeMs,
+          snapshot: result.snapshot,
+          runtimeIntelligence: result.runtimeIntelligence,
           passedTestCases: 0,
           totalTestCases: 0
         };
@@ -119,6 +160,8 @@ export abstract class BaseRunner implements LanguageRunner {
             stdout: result.stdout,
             stderr: result.stderr,
             executionTimeMs: totalRuntime,
+            snapshot: result.snapshot,
+            runtimeIntelligence: result.runtimeIntelligence,
             passedTestCases: passed,
             totalTestCases: testCases.length,
             failedTestCase: {
@@ -140,6 +183,8 @@ export abstract class BaseRunner implements LanguageRunner {
             stdout: result.stdout,
             stderr: result.stderr,
             executionTimeMs: totalRuntime,
+            snapshot: result.snapshot,
+            runtimeIntelligence: result.runtimeIntelligence,
             passedTestCases: passed,
             totalTestCases: testCases.length,
             failedTestCase: {

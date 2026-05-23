@@ -2,7 +2,13 @@ import type { SubmissionStatus } from '@codeforge/shared-types';
 
 import type { SubmissionResult, TestCasePayload } from '@codeforge/shared-types';
 
-export interface RunnerResult extends Omit<SubmissionResult, 'submissionId'> {}
+import type { TraceSnapshot } from '../instrumentation/types';
+import type { RuntimeIntelligence } from '../instrumentation/analysis/types';
+
+export interface RunnerResult extends Omit<SubmissionResult, 'submissionId'> {
+  snapshot?: TraceSnapshot;
+  runtimeIntelligence?: RuntimeIntelligence;
+}
 
 export interface RunnerOptions {
   submissionId: string;

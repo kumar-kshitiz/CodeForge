@@ -20,6 +20,7 @@ export const updateStatusSchema = z.object({
   passedTestCases: z.number().int().optional(),
   totalTestCases: z.number().int().optional(),
   failedTestCase: z.any().optional(),
+  runtimeIntelligence: z.any().optional(),
 });
 
 export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;

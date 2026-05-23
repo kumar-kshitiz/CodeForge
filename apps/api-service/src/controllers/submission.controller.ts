@@ -100,3 +100,13 @@ export async function getFeedback(req: Request, res: Response, next: NextFunctio
     next(err);
   }
 }
+
+export async function getErrorFeedback(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const feedback = await aiService.generateErrorFeedback(req.params.id);
+    res.json({ feedback });
+  } catch (err: any) {
+    console.error("ERROR IN getErrorFeedback:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+}

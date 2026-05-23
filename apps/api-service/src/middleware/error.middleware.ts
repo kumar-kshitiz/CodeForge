@@ -24,6 +24,9 @@ export function errorMiddleware(
 
   if (statusCode >= 500) {
     console.error('[error]', err);
+    try {
+      require('fs').appendFileSync('/tmp/api_error.log', new Date().toISOString() + '\\n' + String(err.stack || err.message) + '\\n\\n');
+    } catch(e) {}
   }
 
   res.status(statusCode).json({ error: message });

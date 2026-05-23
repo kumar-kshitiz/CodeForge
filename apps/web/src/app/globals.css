@@ -1407,6 +1407,213 @@ body {
 
 .ai-card li { margin-bottom: 8px; }
 
+/* ─── Error Agent Feedback UI ────────────────────────────────────────────── */
+
+/* CTA variant for error verdicts */
+.ai-feedback-cta-error {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+
+.ai-cta-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.btn-error-analyze {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.btn-error-analyze:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+}
+
+.btn-error-analyze:active { transform: translateY(0); }
+
+/* Error Feedback Container */
+.ai-error-feedback-container {
+  margin-top: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* Header bar with colored left border */
+.ai-error-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  border-left: 4px solid;
+}
+
+.ai-error-icon { font-size: 22px; line-height: 1; }
+
+.ai-error-header-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.ai-error-header-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+/* Body of the error feedback */
+.ai-error-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Generic label + value row */
+.ai-error-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-error-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.ai-error-field-value {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.ai-error-field-value.ai-muted {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ai-error-field-value.ai-fix-text {
+  color: #34d399;
+  font-size: 13px;
+}
+
+/* Tag pill (e.g. crash_type, loop_type) */
+.ai-error-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.25);
+  color: var(--accent-hover);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  width: fit-content;
+}
+
+/* Code snippet block */
+.ai-code-snippet {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.ai-snippet-label {
+  padding: 5px 12px;
+  background: var(--surface-2);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-snippet-code {
+  padding: 12px;
+  background: #0a0e18;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #e2e8f0;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+/* Confidence badge */
+.ai-confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+  margin-top: 4px;
+}
+
+/* Complexity chips (current vs target) */
+.ai-complexity-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-chip {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ai-chip-red {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #f87171;
+}
+
+.ai-chip-green {
+  background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3);
+  color: #34d399;
+}
+
+/* Edge cases list */
+.ai-edge-case-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.8;
+}
+
 /* --- Global Navbar UI --- */
 
 .global-nav {

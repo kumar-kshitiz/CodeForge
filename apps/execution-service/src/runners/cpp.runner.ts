@@ -2,6 +2,8 @@ import { BaseRunner } from './base.runner';
 import { runDockerContainer, killDockerContainer } from '../docker/docker.util';
 import { SANDBOX_CONFIG } from '../config/sandbox.config';
 import type { RunnerResult } from './runner.interface';
+import { InstrumentationEngine } from '../instrumentation/engine';
+import { TraceParser } from '../instrumentation/parser';
 
 export class CppRunner extends BaseRunner {
   readonly extension = 'cpp';
@@ -39,10 +41,15 @@ export class CppRunner extends BaseRunner {
         executionTimeMs: Date.now() - startTime
       };
     } catch (compileErr: any) {
+      const rawStderr = compileErr.stderr || compileErr.message;
+      const rawStdout = compileErr.stdout || '';
+      const lineOffset = InstrumentationEngine.getInjectionOffset('cpp');
+      const parsed = TraceParser.parse(rawStderr, rawStdout, lineOffset);
+
       return {
         verdict: 'compilation_error',
-        stdout: compileErr.stdout || '',
-        stderr: compileErr.stderr || compileErr.message,
+        stdout: parsed.cleanedStdout,
+        stderr: parsed.cleanedStderr,
         executionTimeMs: Date.now() - startTime,
       };
     }

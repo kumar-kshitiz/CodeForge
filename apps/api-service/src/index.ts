@@ -1,3 +1,4 @@
+/// <reference path="./types/express.d.ts" />
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -10,6 +11,7 @@ const server = http.createServer(app);
 
 async function start(): Promise<void> {
   await prisma.$connect();
+  // Server reboot triggered to load updated Prisma schema
   console.log('[api-service] database connected');
 
   server.listen(env.port, () => {
@@ -26,5 +28,6 @@ process.on('SIGTERM', async () => {
   server.close(async () => {
     await prisma.$disconnect();
     console.log('[api-service] shut down');
+    process.exit(0);
   });
 });

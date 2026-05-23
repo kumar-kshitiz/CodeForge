@@ -257,7 +257,10 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
 
             {(activeSubmission.status === 'COMPLETED' || activeSubmission.status === 'FAILED') && (
               <div style={{ marginTop: '24px' }}>
-                <AiFeedbackPanel submissionId={activeSubmission.id} />
+                <AiFeedbackPanel
+                  submissionId={activeSubmission.id}
+                  verdict={activeSubmission.verdict ?? undefined}
+                />
               </div>
             )}
           </div>

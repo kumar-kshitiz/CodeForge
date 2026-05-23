@@ -11,6 +11,8 @@ export const env = {
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   openaiApiKey: process.env.OPENAI_API_KEY,
+  geminiApiKey: process.env.GEMINI_API_KEY,
+  geminiProjectId: process.env.GEMINI_PROJECT_ID,
   jwt: {
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),

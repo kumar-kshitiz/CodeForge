@@ -1,6 +1,5 @@
 import fetch from 'node-fetch';
 import { env } from '../config/env';
-import type { SubmissionResult } from '@codeforge/shared-types';
 
 const INTERNAL_HEADERS = {
   'Content-Type': 'application/json',
@@ -11,7 +10,9 @@ export async function markProcessing(submissionId: string): Promise<void> {
   await patchStatus(submissionId, { status: 'PROCESSING' });
 }
 
-export async function markCompleted(submissionId: string, result: SubmissionResult): Promise<void> {
+import type { RunnerResult } from '../runners/runner.interface';
+
+export async function markCompleted(submissionId: string, result: RunnerResult): Promise<void> {
   await patchStatus(submissionId, {
     status: 'COMPLETED',
     verdict: result.verdict,
@@ -22,6 +23,7 @@ export async function markCompleted(submissionId: string, result: SubmissionResu
     passedTestCases: result.passedTestCases,
     totalTestCases: result.totalTestCases,
     failedTestCase: result.failedTestCase,
+    runtimeIntelligence: result.runtimeIntelligence,
   });
 }
 

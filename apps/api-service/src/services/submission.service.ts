@@ -57,7 +57,7 @@ export async function getRoomSubmissions(roomId: string) {
 }
 
 export async function updateSubmissionStatus(id: string, input: UpdateStatusInput) {
-  const submission = await prisma.submission.update({
+  const submission = await (prisma as any).submission.update({
     where: { id },
     data: {
       status: input.status as SubmissionStatus,
@@ -69,6 +69,7 @@ export async function updateSubmissionStatus(id: string, input: UpdateStatusInpu
       passedTestCases: input.passedTestCases,
       totalTestCases: input.totalTestCases,
       failedTestCase: input.failedTestCase ? input.failedTestCase : undefined,
+      runtimeIntelligence: input.runtimeIntelligence ? input.runtimeIntelligence : undefined,
     },
   });
 
