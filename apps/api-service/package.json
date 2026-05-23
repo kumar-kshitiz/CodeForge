@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
+    "test": "jest --passWithNoTests --coverage",
     "lint": "eslint src/"
   },
   "dependencies": {
