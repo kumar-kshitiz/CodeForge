@@ -75,21 +75,3 @@ ${submission.sourceCode.substring(0, 4000)}`;
 
   return { system, user };
 }
-
-export function getMockComplexityFeedback(language: string): ComplexityErrorFeedback {
-  return {
-    error_type: 'time_limit_exceeded',
-    language,
-    estimated_complexity: 'O(N²) (mock response — OPENAI_API_KEY not set)',
-    bottleneck: 'Nested loops iterating over the entire input for each element',
-    root_cause:
-      'The current solution has quadratic time complexity. For large inputs (N > 10^5), this exceeds the time limit.',
-    simple_explanation:
-      'Your solution is too slow because it checks every pair of elements. For large inputs, this means doing billions of operations.',
-    slow_code_snippet: '// Unable to determine without API key',
-    optimization_approach:
-      'Consider using sorting + binary search, a hash map for O(1) lookups, or a sliding window technique to reduce to O(N) or O(N log N).',
-    target_complexity: 'O(N log N)',
-    confidence: 0.5,
-  };
-}

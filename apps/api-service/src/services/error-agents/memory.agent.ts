@@ -71,20 +71,3 @@ ${submission.sourceCode.substring(0, 4000)}`;
   return { system, user };
 }
 
-export function getMockMemoryFeedback(language: string): MemoryErrorFeedback {
-  return {
-    error_type: 'memory_limit_exceeded',
-    language,
-    estimated_space_complexity: 'O(N²) (mock response — OPENAI_API_KEY not set)',
-    memory_hog: 'A 2D array or adjacency matrix sized N×N',
-    root_cause:
-      'The solution allocates a matrix or nested array that grows quadratically with input size, exhausting available memory.',
-    simple_explanation:
-      'Your program is using too much memory. This often happens when you create a very large 2D array or store all data in memory at once.',
-    problematic_allocation: '// Unable to determine without API key',
-    optimization_approach:
-      'Replace 2D matrix with an adjacency list, use in-place algorithms, or use rolling arrays for DP to reduce space from O(N²) to O(N).',
-    target_space_complexity: 'O(N)',
-    confidence: 0.5,
-  };
-}

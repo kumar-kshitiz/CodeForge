@@ -71,16 +71,3 @@ ${(submission.stderr || '').substring(0, 1000)}${testCaseInfo}`;
 
   return { system, user };
 }
-
-export function getMockRuntimeFeedback(language: string): RuntimeErrorFeedback {
-  return {
-    error_type: 'runtime_error',
-    root_cause: 'out_of_bounds_array_access',
-    simple_explanation: 'Your code attempted to read from or write to a memory location outside the boundaries of your array.',
-    crash_trigger: 'The index reached a value equal to or greater than the array size during the loop execution.',
-    problematic_pattern: 'Negative index or massive index accessed (mock data - API key missing)',
-    minimal_fix_direction: 'Add a boundary check `if (index >= 0 && index < size)` before accessing the array.',
-    prevention_tip: 'Always ensure your loop termination conditions are strictly less than (`<`) the size of the array, not less than or equal (`<=`).',
-    confidence: 0.95
-  };
-}

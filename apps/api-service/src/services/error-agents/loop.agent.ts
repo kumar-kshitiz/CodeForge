@@ -72,19 +72,3 @@ ${testInfo}`;
 
   return { system, user };
 }
-
-export function getMockLoopFeedback(language: string): LoopErrorFeedback {
-  return {
-    error_type: 'infinite_loop',
-    language,
-    loop_type: 'while_loop',
-    root_cause: 'Loop variable is never updated inside the loop body (mock response — OPENAI_API_KEY not set)',
-    simple_explanation:
-      'Your program got stuck in a loop that never ends. This usually happens when the condition to exit the loop is never met, like forgetting to increment a counter.',
-    problematic_loop: '// Unable to determine without API key',
-    termination_condition_issue:
-      'The loop condition always evaluates to true because the variable controlling it is never modified.',
-    minimal_fix: 'Ensure the loop variable is updated inside the loop body, or add a proper break condition.',
-    confidence: 0.5,
-  };
-}

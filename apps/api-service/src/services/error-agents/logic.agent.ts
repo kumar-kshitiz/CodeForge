@@ -77,20 +77,3 @@ ${testInfo}`;
 
   return { system, user };
 }
-
-export function getMockLogicFeedback(language: string): LogicErrorFeedback {
-  return {
-    error_type: 'wrong_answer',
-    language,
-    mismatch_analysis:
-      'The actual output differs from the expected output (mock response — OPENAI_API_KEY not set)',
-    root_cause: 'Possible off-by-one error or incorrect boundary condition in the main logic',
-    simple_explanation:
-      'Your code runs without crashing, but produces incorrect results. This usually means the algorithm logic has a bug, like using < instead of <=, or not handling a special case.',
-    problematic_logic: '// Unable to determine without API key',
-    suggested_fix:
-      'Trace through the failing test case manually step by step. Check loop boundaries and conditional checks.',
-    edge_cases_to_check: ['Empty input', 'Single element', 'All elements equal', 'Negative numbers'],
-    confidence: 0.4,
-  };
-}

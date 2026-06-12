@@ -4,12 +4,12 @@ import { prisma } from '../prisma/client';
 import { env } from '../config/env';
 
 // ─── Error Agents ────────────────────────────────────────────────────────────
-import { buildCompilePrompt, CompileErrorSchema, getMockCompileFeedback } from './error-agents/compile.agent';
-import { buildRuntimePrompt, RuntimeErrorSchema, getMockRuntimeFeedback } from './error-agents/runtime.agent';
-import { buildLogicPrompt, LogicErrorSchema, getMockLogicFeedback } from './error-agents/logic.agent';
-import { buildComplexityPrompt, ComplexityErrorSchema, getMockComplexityFeedback } from './error-agents/complexity.agent';
-import { buildMemoryPrompt, MemoryErrorSchema, getMockMemoryFeedback } from './error-agents/memory.agent';
-import { buildLoopPrompt, LoopErrorSchema, getMockLoopFeedback } from './error-agents/loop.agent';
+import { buildCompilePrompt, CompileErrorSchema } from './error-agents/compile.agent';
+import { buildRuntimePrompt, RuntimeErrorSchema } from './error-agents/runtime.agent';
+import { buildLogicPrompt, LogicErrorSchema } from './error-agents/logic.agent';
+import { buildComplexityPrompt, ComplexityErrorSchema } from './error-agents/complexity.agent';
+import { buildMemoryPrompt, MemoryErrorSchema } from './error-agents/memory.agent';
+import { buildLoopPrompt, LoopErrorSchema } from './error-agents/loop.agent';
 
 const genAI = env.geminiApiKey ? new GoogleGenerativeAI(env.geminiApiKey) : null;
 
@@ -179,9 +179,7 @@ export async function generateErrorFeedback(submissionId: string) {
 
   // 3. Fallback mock if no API key
   if (!genAI) {
-    console.log(`[AI:ErrorAgent] Missing GEMINI_API_KEY, using mock fallback for ${errorType}.`);
-    const mockResponse = buildMockResponse(errorType, submission.language);
-    return saveErrorFeedback(submissionId, errorType, mockResponse);
+    return `[AI:ErrorAgent] Missing GEMINI_API_KEY`;
   }
 
   // 4. Build agent-specific prompt
@@ -283,22 +281,6 @@ function validateAgentResponse(errorType: ErrorVerdictKey, parsed: unknown): unk
   }
 }
 
-function buildMockResponse(errorType: ErrorVerdictKey, language: string): unknown {
-  switch (errorType) {
-    case 'compilation_error':
-      return getMockCompileFeedback(language);
-    case 'runtime_error':
-      return getMockRuntimeFeedback(language);
-    case 'wrong_answer':
-      return getMockLogicFeedback(language);
-    case 'time_limit_exceeded':
-      return getMockComplexityFeedback(language);
-    case 'memory_limit_exceeded':
-      return getMockMemoryFeedback(language);
-    case 'infinite_loop':
-      return getMockLoopFeedback(language);
-  }
-}
 
 async function saveErrorFeedback(submissionId: string, errorType: string, agentResponse: unknown) {
   // @ts-ignore - Bypass IDE caching issue for newly generated Prisma client properties

@@ -84,17 +84,3 @@ ${(submission.stderr || '').substring(0, 2000)}`;
 
   return { system, user };
 }
-
-export function getMockCompileFeedback(language: string): CompileErrorFeedback {
-  return {
-    error_type: 'compile_error',
-    language,
-    root_cause: 'Syntax error: missing semicolon or mismatched braces (mock response — OPENAI_API_KEY not set)',
-    simple_explanation:
-      'The compiler could not understand part of your code. This is usually a missing semicolon, mismatched parentheses, or a typo in a keyword.',
-    problematic_code: '// Unable to determine without API key',
-    minimal_fix: 'Check the line number in the error output and look for missing semicolons, brackets, or typos.',
-    compiler_message_summary: 'Compilation failed due to a syntax error (mock response)',
-    confidence: 0.5,
-  };
-}
