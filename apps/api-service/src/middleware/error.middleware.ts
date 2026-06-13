@@ -11,6 +11,7 @@ export function errorMiddleware(
   res: Response,
   _next: NextFunction,
 ): void {
+  
   if (err instanceof ZodError) {
     res.status(400).json({
       error: 'Validation failed',

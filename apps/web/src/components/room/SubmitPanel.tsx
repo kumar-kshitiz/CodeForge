@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRoomStore } from '@/store/roomStore';
 import { getSocket } from '@/lib/socket';
 import { SocketEvent } from '@codeforge/shared-types';
@@ -41,6 +41,26 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
   const [history, setHistory] = useState<SubmissionHistory[]>([]);
   const [activeSubmission, setActiveSubmission] = useState<SubmissionHistory | null>(null);
   const [error, setError] = useState('');
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const socketFallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentSubmissionIdRef = useRef<string | null>(null);
+  const receivedSocketUpdateRef = useRef(false);
+
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  const stopFallbackTimer = () => {
+    if (socketFallbackTimeoutRef.current) {
+      clearTimeout(socketFallbackTimeoutRef.current);
+      socketFallbackTimeoutRef.current = null;
+    }
+  };
 
   // Fetch history on mount
   useEffect(() => {
@@ -63,33 +83,57 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
   // Socket Listeners for Realtime Updates
   useEffect(() => {
     const token = getToken();
-    const username = typeof window !== 'undefined' ? localStorage.getItem('username') || 'Anonymous' : 'Anonymous';
+
+    const username =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('username') || 'Anonymous'
+        : 'Anonymous';
+
     const socket = getSocket(token, username);
+
     if (!socket) return;
 
-    const handleUpdate = (payload: any) => {
+    const handleUpdate = (payload: SubmissionHistory) => {
+      if (
+        currentSubmissionIdRef.current &&
+        payload.id === currentSubmissionIdRef.current
+      ) {
+        receivedSocketUpdateRef.current = true;
+
+        stopFallbackTimer();
+
+        setStatus(payload.status);
+      }
+
       setHistory((prev) => {
-        const index = prev.findIndex((s) => s.id === payload.id);
-        if (index > -1) {
-          const newHistory = [...prev];
-          newHistory[index] = payload;
-          return newHistory;
-        } else {
-          return [payload, ...prev];
+        const idx = prev.findIndex((s) => s.id === payload.id);
+
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = payload;
+          return copy;
         }
+
+        return [payload, ...prev];
       });
 
       setActiveSubmission((prev) => {
-        if (prev?.id === payload.id) return payload;
+        if (prev?.id === payload.id) {
+          return payload;
+        }
         return prev;
       });
 
-      // Update global status if this is our active run
-      if (status !== 'idle' && status !== 'COMPLETED' && status !== 'FAILED') {
-        setStatus(payload.status);
-        if (payload.status === 'COMPLETED' || payload.status === 'FAILED') {
-          setTimeout(() => setStatus('idle'), 2000); // return to idle after 2s
-        }
+      if (
+        payload.status === 'COMPLETED' ||
+        payload.status === 'FAILED'
+      ) {
+        stopPolling();
+        stopFallbackTimer();
+
+        setTimeout(() => {
+          setStatus('idle');
+        }, 2000);
       }
     };
 
@@ -99,12 +143,15 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
     socket.on(SocketEvent.SUBMISSION_FAILED, handleUpdate);
 
     return () => {
+      stopPolling();
+      stopFallbackTimer();
+
       socket.off(SocketEvent.SUBMISSION_QUEUED, handleUpdate);
       socket.off(SocketEvent.SUBMISSION_PROCESSING, handleUpdate);
       socket.off(SocketEvent.SUBMISSION_COMPLETED, handleUpdate);
       socket.off(SocketEvent.SUBMISSION_FAILED, handleUpdate);
     };
-  }, [status]);
+  }, []);
 
   async function handleSubmit() {
     if (!code.trim()) return;
@@ -133,14 +180,22 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
         setStatus('idle');
         return;
       }
-      
+
       const data = await res.json();
       setActiveSubmission(data.submission);
       setHistory((prev) => [data.submission, ...prev]);
       setStatus('PENDING');
 
-      // Poll for result if no socket feedback arrives within 15s
-      pollSubmissionStatus(data.submission.id);
+      currentSubmissionIdRef.current = data.submission.id;
+
+      receivedSocketUpdateRef.current = false;
+
+      stopFallbackTimer();
+      socketFallbackTimeoutRef.current = setTimeout(() => {
+        if (!receivedSocketUpdateRef.current) {
+          pollSubmissionStatus(data.submission.id);
+        }
+      }, 5000);
 
     } catch {
       setError('Network error — is the API server running?');
@@ -148,36 +203,75 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
     }
   }
 
-  async function pollSubmissionStatus(submissionId: string) {
-    const maxAttempts = 30; // 30 × 1s = 30s max
+  function pollSubmissionStatus(submissionId: string) {
+    stopPolling();
+
     let attempts = 0;
-    const interval = setInterval(async () => {
+    const maxAttempts = 30;
+
+    pollIntervalRef.current = setInterval(async () => {
       attempts++;
+
       try {
-        const res = await fetch(`${API}/api/submissions/${submissionId}`, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
+        const res = await fetch(
+          `${API}/api/submissions/${submissionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${getToken()}`,
+            },
+          }
+        );
+
         const data = await res.json();
+
         const sub = data.submission;
-        if (sub && (sub.status === 'COMPLETED' || sub.status === 'FAILED')) {
-          clearInterval(interval);
-          setActiveSubmission(sub);
-          setHistory((prev) => {
-            const index = prev.findIndex((s) => s.id === sub.id);
-            if (index > -1) {
-              const newHistory = [...prev];
-              newHistory[index] = sub;
-              return newHistory;
-            }
-            return [sub, ...prev];
-          });
-          setStatus('idle');
+
+        if (!sub) return;
+
+        setStatus(sub.status);
+
+        setHistory((prev) => {
+          const idx = prev.findIndex((s) => s.id === sub.id);
+
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = sub;
+            return copy;
+          }
+
+          return [sub, ...prev];
+        });
+
+        setActiveSubmission((prev) => {
+          if (prev?.id === sub.id) {
+            return sub;
+          }
+          return prev;
+        });
+
+        if (
+          sub.status === 'COMPLETED' ||
+          sub.status === 'FAILED'
+        ) {
+          stopPolling();
+          stopFallbackTimer();
+
+          setTimeout(() => {
+            setStatus('idle');
+          }, 2000);
         }
-      } catch { /* ignore poll errors */ }
+      } catch {
+        // Ignore transient errors
+      }
+
       if (attempts >= maxAttempts) {
-        clearInterval(interval);
+        stopPolling();
+
         setStatus('idle');
-        setError('Execution timed out. Please try again.');
+
+        setError(
+          'Execution status could not be retrieved.'
+        );
       }
     }, 1000);
   }
@@ -272,8 +366,8 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
             <h4>Recent Runs</h4>
             <div className="history-table">
               {history.map((sub) => (
-                <div 
-                  key={sub.id} 
+                <div
+                  key={sub.id}
                   className={`history-row ${activeSubmission?.id === sub.id ? 'active' : ''}`}
                   onClick={() => setActiveSubmission(sub)}
                 >
