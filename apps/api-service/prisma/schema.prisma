@@ -2,6 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "./ERD.svg"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -21,40 +26,62 @@ enum SubmissionStatus {
 }
 
 model User {
-  id              String             @id @default(cuid())
-  username        String             @unique
-  email           String             @unique
-  passwordHash    String
-  role            Role               @default(CANDIDATE)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  refreshTokens   RefreshToken[]
-  rooms           InterviewRoom[]
-  participations  RoomParticipant[]
-  submissions     Submission[]
-  drafts          CodeDraft[]
-  contestParticipations ContestParticipant[]
+  id            String         @id @default(cuid())
+  username      String         @unique
+  email         String         @unique
+  passwordHash  String
+  role          Role           @default(CANDIDATE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  refreshTokens RefreshToken[]
+  submissions   Submission[]
+  drafts        CodeDraft[]
+  challengeProgress ChallengeProgress[]
 
   @@map("users")
 }
 
 model Problem {
-  id          String       @id @default(cuid())
-  slug        String       @unique
-  title       String
-  description String
-  difficulty  String
-  starterCode Json
-  constraints Json?
-  examples    Json?
-  createdAt   DateTime     @default(now())
-  submissions Submission[]
-  tags        ProblemTag[]
-  drafts      CodeDraft[]
-  contestProblems ContestProblem[]
-  testCases   TestCase[]
+  id                String             @id @default(cuid())
+  slug              String             @unique
+  title             String
+  difficulty        String
+  statementMd       String             @map("statement_md") @db.Text
+  constraintsMd     String             @map("constraints_md") @db.Text
+  timeLimitMs       Int                @default(2000) @map("time_limit_ms")
+  memoryLimitMb     Int                @default(256) @map("memory_limit_mb")
+  status            String             @default("PUBLISHED")
+  version           Int                @default(1)
+  kind              String             @default("QUESTION")
+  challengeEndsAt   DateTime?          @map("challenge_ends_at")
+  publishAfterChallenge Boolean        @default(false) @map("publish_after_challenge")
+  starterCode       Json?              @map("starter_code")
+  examples          ProblemExample[]
+  testCases         TestCase[]
+  officialSolutions OfficialSolution[]
+  submissions       Submission[]
+  tags              ProblemTag[]
+  drafts            CodeDraft[]
+  challengeProgress ChallengeProgress[]
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
   @@map("problems")
+}
+
+model ProblemExample {
+  id          String  @id @default(cuid())
+  problemId   String  @map("problem_id")
+  inputText   String  @map("input_text") @db.Text
+  outputText  String  @map("output_text") @db.Text
+  explanation String? @db.Text
+  position    Int     @default(0)
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, position])
+  @@index([problemId])
+  @@map("problem_examples")
 }
 
 model ProblemTag {
@@ -66,17 +93,37 @@ model ProblemTag {
 }
 
 model TestCase {
-  id             String   @id @default(cuid())
-  problemId      String
-  input          String   @db.Text
-  expectedOutput String   @db.Text
-  isHidden       Boolean  @default(false)
-  order          Int      @default(0)
-  createdAt      DateTime @default(now())
-  
-  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  problemId         String   @map("problem_id")
+  visibility        String   @default("HIDDEN")
+  inputKey          String   @map("input_key") @db.Text
+  expectedOutputKey String   @map("expected_output_key") @db.Text
+  points            Int      @default(1)
+  position          Int      @default(0)
+  groupId           String?  @map("group_id")
+  createdAt         DateTime @default(now()) @map("created_at")
 
+  problem Problem                @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  results SubmissionTestResult[]
+
+  @@unique([problemId, position])
+  @@index([problemId, visibility])
   @@map("test_cases")
+}
+
+model OfficialSolution {
+  id          String @id @default(cuid())
+  problemId   String @map("problem_id")
+  language    String
+  sourceKey   String @map("source_key") @db.Text
+  editorialMd String @map("editorial_md") @db.Text
+  visibility  String @default("PRIVATE")
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, language])
+  @@index([problemId])
+  @@map("official_solutions")
 }
 
 model CodeDraft {
@@ -95,99 +142,100 @@ model CodeDraft {
 }
 
 model Submission {
-  id              String           @id @default(cuid())
-  userId          String
-  problemId       String?
-  roomId          String?
-  contestId       String?
-  language        String
-  sourceCode      String
-  status          SubmissionStatus @default(PENDING)
-  verdict         String?
-  stdout          String?
-  stderr          String?
-  executionTimeMs Int?
-  memory          String?
-  passedTestCases Int?
-  totalTestCases  Int?
-  failedTestCase  Json?
-  runtimeIntelligence Json?
-  createdAt       DateTime         @default(now())
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  problem         Problem?         @relation(fields: [problemId], references: [id], onDelete: SetNull)
-  room            InterviewRoom?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  contest         Contest?         @relation(fields: [contestId], references: [id], onDelete: SetNull)
-  contestSubmission ContestSubmission?
-  feedback          SubmissionFeedback?
-  errorFeedback     SubmissionErrorFeedback?
+  id                  String                   @id @default(cuid())
+  problemId           String                   @map("problem_id")
+  userId              String                   @map("user_id")
+  language            String
+  mode                String                   @default("SUBMIT") @map("execution_mode")
+  scoreAwarded        Float?                   @map("score_awarded")
+  sourceKey           String                   @map("source_key") @db.Text
+  status              SubmissionStatus         @default(PENDING)
+  verdict             String?
+  stdout              String?
+  stderr              String?
+  runtimeMs           Int?                     @map("runtime_ms")
+  memoryKb            Int?                     @map("memory_kb")
+  passedTestCases     Int?                     @map("passed_test_cases")
+  totalTestCases      Int?                     @map("total_test_cases")
+  failedTestCase      Json?                    @map("failed_test_case")
+  runtimeIntelligence Json?                    @map("runtime_intelligence")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem             Problem                  @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  testResults         SubmissionTestResult[]
+  feedback            SubmissionFeedback?
+  errorFeedback       SubmissionErrorFeedback?
 
+  @@index([userId, createdAt])
+  @@index([problemId, createdAt])
+  @@index([userId, problemId, mode, createdAt])
   @@map("submissions")
 }
 
+model ChallengeProgress {
+  id             String    @id @default(cuid())
+  problemId      String    @map("problem_id")
+  userId         String    @map("user_id")
+  runCount       Int       @default(0) @map("run_count")
+  submissionCount Int      @default(0) @map("submission_count")
+  firstRunPassed Boolean   @default(false) @map("first_run_passed")
+  currentScore   Float     @default(0) @map("current_score")
+  bestScore      Float     @default(0) @map("best_score")
+  solvedAt       DateTime? @map("solved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, userId])
+  @@index([problemId, bestScore])
+  @@index([userId, updatedAt])
+  @@map("challenge_progress")
+}
+
+model SubmissionTestResult {
+  id           String @id @default(cuid())
+  submissionId String @map("submission_id")
+  testCaseId   String @map("test_case_id")
+  verdict      String
+  runtimeMs    Int?   @map("runtime_ms")
+  memoryKb     Int?   @map("memory_kb")
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  testCase   TestCase   @relation(fields: [testCaseId], references: [id], onDelete: Restrict)
+
+  @@unique([submissionId, testCaseId])
+  @@index([submissionId])
+  @@map("submission_test_results")
+}
+
 model SubmissionFeedback {
-  id                 String     @id @default(cuid())
-  submissionId       String     @unique
+  id                 String   @id @default(cuid())
+  submissionId       String   @unique
   summary            String
   strengths          Json
   weaknesses         Json
   optimizations      Json
   complexityEstimate String
   readabilityScore   Int
-  createdAt          DateTime   @default(now())
+  createdAt          DateTime @default(now())
 
-  submission         Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@map("submission_feedbacks")
 }
 
 model SubmissionErrorFeedback {
-  id           String     @id @default(cuid())
-  submissionId String     @unique
-  errorType    String
+  id            String   @id @default(cuid())
+  submissionId  String   @unique
+  errorType     String
   agentResponse Json
-  createdAt    DateTime   @default(now())
+  createdAt     DateTime @default(now())
 
-  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@map("submission_error_feedbacks")
-}
-
-model InterviewRoom {
-  id           String             @id @default(cuid())
-  title        String
-  createdBy    String
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  host         User               @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  participants RoomParticipant[]
-  snapshots    RoomCodeSnapshot[]
-  submissions  Submission[]
-  sessions     InterviewSession[]
-
-  @@map("interview_rooms")
-}
-
-model RoomParticipant {
-  id       String        @id @default(cuid())
-  roomId   String
-  userId   String
-  joinedAt DateTime      @default(now())
-  room     InterviewRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([roomId, userId])
-  @@map("room_participants")
-}
-
-model RoomCodeSnapshot {
-  id       String        @id @default(cuid())
-  roomId   String
-  language String
-  code     String
-  savedAt  DateTime      @default(now())
-  room     InterviewRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-
-  @@map("room_code_snapshots")
 }
 
 model RefreshToken {
@@ -199,84 +247,4 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
-}
-
-model Contest {
-  id          String               @id @default(cuid())
-  title       String
-  description String
-  startTime   DateTime
-  endTime     DateTime
-  createdAt   DateTime             @default(now())
-  problems    ContestProblem[]
-  participants ContestParticipant[]
-  submissions Submission[]
-  contestSubmissions ContestSubmission[]
-
-  @@map("contests")
-}
-
-model ContestProblem {
-  id        String   @id @default(cuid())
-  contestId String
-  problemId String
-  points    Int
-  contest   Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-  @@unique([contestId, problemId])
-  @@map("contest_problems")
-}
-
-model ContestParticipant {
-  id         String   @id @default(cuid())
-  contestId  String
-  userId     String
-  score      Int      @default(0)
-  penalty    Int      @default(0)
-  joinedAt   DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  contest    Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([contestId, userId])
-  @@map("contest_participants")
-}
-
-model ContestSubmission {
-  id            String     @id @default(cuid())
-  contestId     String
-  submissionId  String     @unique
-  problemId     String
-  pointsAwarded Int        @default(0)
-  penaltyTime   Int        @default(0)
-  createdAt     DateTime   @default(now())
-  contest       Contest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  submission    Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-
-  @@map("contest_submissions")
-}
-
-model InterviewSession {
-  id        String   @id @default(cuid())
-  roomId    String
-  room      InterviewRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  startedAt DateTime @default(now())
-  endedAt   DateTime?
-  createdAt DateTime @default(now())
-  events    SessionEvent[]
-
-  @@map("interview_sessions")
-}
-
-model SessionEvent {
-  id         String   @id @default(cuid())
-  sessionId  String
-  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  userId     String?
-  eventType  String
-  payload    Json
-  createdAt  DateTime @default(now())
-
-  @@map("session_events")
 }

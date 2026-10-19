@@ -1,0 +1,20 @@
+# Dependencies
+/node_modules/
+
+# Build, compiler, and test output
+/dist/
+/.turbo/
+/coverage/
+/.nyc_output/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env*
+!.env.example
+!.env.*.example
+
+# Runtime and debug output
+*.log
+*.pid
+*.pid.lock
+.eslintcache

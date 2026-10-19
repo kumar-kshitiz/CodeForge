@@ -1,26 +1,34 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useRoomStore } from '@/store/roomStore';
-import { getSocket } from '@/lib/socket';
-import { SocketEvent } from '@codeforge/shared-types';
-import AiFeedbackPanel from '../ai-feedback/AiFeedbackPanel';
+import { useState, useEffect, useRef } from "react";
+import AiFeedbackPanel from "../ai-feedback/AiFeedbackPanel";
 
 interface SubmitPanelProps {
   code: string;
   language: string;
   problemId?: string;
-  contestId?: string;
 }
 
-type Status = 'idle' | 'submitting' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+type Status =
+  | "idle"
+  | "submitting"
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
+
+type ExecutionMode = "RUN" | "SUBMIT";
 
 export interface SubmissionHistory {
   id: string;
+  problemId?: string;
+  mode?: ExecutionMode;
   status: Status;
   verdict: string | null;
   language: string;
-  executionTimeMs: number | null;
+  runtimeMs: number | null;
+  memoryKb?: number | null;
+  scoreAwarded?: number | null;
   createdAt: string;
   stdout: string | null;
   stderr: string | null;
@@ -29,24 +37,26 @@ export interface SubmissionHistory {
   failedTestCase?: { input: string; expected: string; actual: string } | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function getToken(): string {
-  return typeof window !== 'undefined' ? (localStorage.getItem('accessToken') ?? '') : '';
+  return typeof window !== "undefined"
+    ? (localStorage.getItem("accessToken") ?? "")
+    : "";
 }
 
-export default function SubmitPanel({ code, language, problemId, contestId }: SubmitPanelProps) {
-  const roomId = useRoomStore((s) => s.roomId);
-  const [status, setStatus] = useState<Status>('idle');
+export default function SubmitPanel({
+  code,
+  language,
+  problemId,
+}: SubmitPanelProps) {
+  const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<SubmissionHistory[]>([]);
-  const [activeSubmission, setActiveSubmission] = useState<SubmissionHistory | null>(null);
-  const [error, setError] = useState('');
+  const [activeSubmission, setActiveSubmission] =
+    useState<SubmissionHistory | null>(null);
+  const [error, setError] = useState("");
+  const [activeMode, setActiveMode] = useState<ExecutionMode | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const socketFallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const currentSubmissionIdRef = useRef<string | null>(null);
-  const receivedSocketUpdateRef = useRef(false);
-
 
   const stopPolling = () => {
     if (pollIntervalRef.current) {
@@ -55,155 +65,81 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
     }
   };
 
-  const stopFallbackTimer = () => {
-    if (socketFallbackTimeoutRef.current) {
-      clearTimeout(socketFallbackTimeoutRef.current);
-      socketFallbackTimeoutRef.current = null;
-    }
-  };
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   // Fetch history on mount
   useEffect(() => {
-    if (!roomId) return;
-    fetch(`${API}/api/rooms/${roomId}/submissions`, {
+    const historyUrl = problemId
+      ? `${API}/api/submissions?problemId=${encodeURIComponent(problemId)}`
+      : `${API}/api/submissions`;
+
+    fetch(historyUrl, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then((res) => res.json())
       .then((data) => {
         if (data.submissions) {
-          setHistory(data.submissions);
-          if (data.submissions.length > 0) {
-            setActiveSubmission(data.submissions[0]);
+          const submissions = data.submissions as SubmissionHistory[];
+          // Filter to show submissions for the current problem if applicable
+          const relevantSubmissions = problemId
+            ? submissions.filter((submission) => submission.problemId === problemId)
+            : submissions;
+
+          setHistory(relevantSubmissions);
+          if (relevantSubmissions.length > 0) {
+            setActiveSubmission(relevantSubmissions[0]);
           }
         }
       })
-      .catch((err) => console.error('Failed to load history', err));
-  }, [roomId]);
+      .catch((err) => console.error("Failed to load history", err));
+  }, [problemId]);
 
-  // Socket Listeners for Realtime Updates
-  useEffect(() => {
-    const token = getToken();
-
-    const username =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('username') || 'Anonymous'
-        : 'Anonymous';
-
-    const socket = getSocket(token, username);
-
-    if (!socket) return;
-
-    const handleUpdate = (payload: SubmissionHistory) => {
-      if (
-        currentSubmissionIdRef.current &&
-        payload.id === currentSubmissionIdRef.current
-      ) {
-        receivedSocketUpdateRef.current = true;
-
-        stopFallbackTimer();
-
-        setStatus(payload.status);
-      }
-
-      setHistory((prev) => {
-        const idx = prev.findIndex((s) => s.id === payload.id);
-
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = payload;
-          return copy;
-        }
-
-        return [payload, ...prev];
-      });
-
-      setActiveSubmission((prev) => {
-        if (prev?.id === payload.id) {
-          return payload;
-        }
-        return prev;
-      });
-
-      if (
-        payload.status === 'COMPLETED' ||
-        payload.status === 'FAILED'
-      ) {
-        stopPolling();
-        stopFallbackTimer();
-
-        setTimeout(() => {
-          setStatus('idle');
-        }, 2000);
-      }
-    };
-
-    socket.on(SocketEvent.SUBMISSION_QUEUED, handleUpdate);
-    socket.on(SocketEvent.SUBMISSION_PROCESSING, handleUpdate);
-    socket.on(SocketEvent.SUBMISSION_COMPLETED, handleUpdate);
-    socket.on(SocketEvent.SUBMISSION_FAILED, handleUpdate);
-
-    return () => {
-      stopPolling();
-      stopFallbackTimer();
-
-      socket.off(SocketEvent.SUBMISSION_QUEUED, handleUpdate);
-      socket.off(SocketEvent.SUBMISSION_PROCESSING, handleUpdate);
-      socket.off(SocketEvent.SUBMISSION_COMPLETED, handleUpdate);
-      socket.off(SocketEvent.SUBMISSION_FAILED, handleUpdate);
-    };
-  }, []);
-
-  async function handleSubmit() {
+  async function handleExecute(mode: ExecutionMode) {
     if (!code.trim()) return;
 
-    setStatus('submitting');
-    setError('');
+    setStatus("submitting");
+    setActiveMode(mode);
+    setError("");
 
     try {
-      // Fake rooms start with 'problem-' and aren't in the DB.
-      // We omit them so Prisma doesn't throw a foreign key constraint error.
-      const dbRoomId = roomId?.startsWith('problem-') ? undefined : roomId;
-
       const res = await fetch(`${API}/api/submissions`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${getToken()}`,
         },
-        // roomId is optional — null is fine for solo problem workspace
-        body: JSON.stringify({ language, sourceCode: code, roomId: dbRoomId, problemId, contestId }),
+        body: JSON.stringify({ language, sourceCode: code, problemId, mode }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? `Submit failed (${res.status})`);
-        setStatus('idle');
+        setStatus("idle");
+        setActiveMode(null);
         return;
       }
 
       const data = await res.json();
       setActiveSubmission(data.submission);
-      setHistory((prev) => [data.submission, ...prev]);
-      setStatus('PENDING');
+      if (mode === "SUBMIT") {
+        setHistory((prev) => [data.submission, ...prev]);
+      }
+      setStatus("PENDING");
 
-      currentSubmissionIdRef.current = data.submission.id;
-
-      receivedSocketUpdateRef.current = false;
-
-      stopFallbackTimer();
-      socketFallbackTimeoutRef.current = setTimeout(() => {
-        if (!receivedSocketUpdateRef.current) {
-          pollSubmissionStatus(data.submission.id);
-        }
-      }, 5000);
-
+      pollSubmissionStatus(data.submission.id, mode);
     } catch {
-      setError('Network error — is the API server running?');
-      setStatus('idle');
+      setError("Network error — is the API server running?");
+      setStatus("idle");
+      setActiveMode(null);
     }
   }
 
-  function pollSubmissionStatus(submissionId: string) {
+  function pollSubmissionStatus(
+    submissionId: string,
+    mode: ExecutionMode,
+  ) {
     stopPolling();
 
     let attempts = 0;
@@ -213,14 +149,15 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
       attempts++;
 
       try {
-        const res = await fetch(
-          `${API}/api/submissions/${submissionId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${getToken()}`,
-            },
-          }
-        );
+        const res = await fetch(`${API}/api/submissions/${submissionId}`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`Status request failed (${res.status})`);
+        }
 
         const data = await res.json();
 
@@ -230,17 +167,19 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
 
         setStatus(sub.status);
 
-        setHistory((prev) => {
-          const idx = prev.findIndex((s) => s.id === sub.id);
+        if (mode === "SUBMIT") {
+          setHistory((prev) => {
+            const idx = prev.findIndex((s) => s.id === sub.id);
 
-          if (idx >= 0) {
-            const copy = [...prev];
-            copy[idx] = sub;
-            return copy;
-          }
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = sub;
+              return copy;
+            }
 
-          return [sub, ...prev];
-        });
+            return [sub, ...prev];
+          });
+        }
 
         setActiveSubmission((prev) => {
           if (prev?.id === sub.id) {
@@ -249,15 +188,11 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
           return prev;
         });
 
-        if (
-          sub.status === 'COMPLETED' ||
-          sub.status === 'FAILED'
-        ) {
+        if (sub.status === "COMPLETED" || sub.status === "FAILED") {
           stopPolling();
-          stopFallbackTimer();
-
           setTimeout(() => {
-            setStatus('idle');
+            setStatus("idle");
+            setActiveMode(null);
           }, 2000);
         }
       } catch {
@@ -266,33 +201,80 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
 
       if (attempts >= maxAttempts) {
         stopPolling();
-
-        setStatus('idle');
-
+        setStatus("idle");
+        setActiveMode(null);
         setError(
-          'Execution status could not be retrieved.'
+          mode === "RUN"
+            ? "The run is still queued. Make sure Redis and the execution service are running."
+            : "The submission is still queued. Make sure Redis and the execution service are running.",
         );
       }
     }, 1000);
   }
 
-  const isRunning = status === 'submitting' || status === 'PENDING' || status === 'PROCESSING';
+  const isRunning =
+    status === "submitting" || status === "PENDING" || status === "PROCESSING";
 
   return (
     <div className="submit-panel">
       <div className="submit-toolbar">
-        <button className="btn-run" onClick={handleSubmit} disabled={isRunning}>
-          {isRunning ? (
+        <button
+          className="btn-run"
+          onClick={() => handleExecute("RUN")}
+          disabled={isRunning}
+        >
+          {isRunning && activeMode === "RUN" ? (
             <>
               <span className="spinner" />
-              {status === 'submitting' ? 'Submitting...' : status === 'PENDING' ? 'Queued...' : 'Executing...'}
+              {status === "submitting"
+                ? "Starting..."
+                : status === "PENDING"
+                  ? "Queued..."
+                  : "Executing..."}
             </>
           ) : (
             <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               Run Code
+            </>
+          )}
+        </button>
+        <button
+          className="btn-submit"
+          onClick={() => handleExecute("SUBMIT")}
+          disabled={isRunning}
+        >
+          {isRunning && activeMode === "SUBMIT" ? (
+            <>
+              <span className="spinner" />
+              {status === "submitting"
+                ? "Submitting..."
+                : status === "PENDING"
+                  ? "Queued..."
+                  : "Judging..."}
+            </>
+          ) : (
+            <>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Submit
             </>
           )}
         </button>
@@ -305,15 +287,26 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
         {activeSubmission && (
           <div className="output-panel">
             <div className="output-header">
-              <span className={`verdict-badge ${activeSubmission.status === 'COMPLETED' ? 'verdict-success' : activeSubmission.status === 'FAILED' ? 'verdict-fail' : ''}`}>
+              <span
+                className={`verdict-badge ${activeSubmission.verdict === "accepted" ? "verdict-success" : activeSubmission.status === "COMPLETED" || activeSubmission.status === "FAILED" ? "verdict-fail" : ""}`}
+              >
                 {activeSubmission.verdict || activeSubmission.status}
               </span>
-              {activeSubmission.executionTimeMs != null && (
-                <span className="exec-time">{activeSubmission.executionTimeMs}ms</span>
+              {activeSubmission.runtimeMs != null && (
+                <span className="exec-time">
+                  {activeSubmission.runtimeMs}ms
+                </span>
               )}
-              {activeSubmission.totalTestCases != null && activeSubmission.totalTestCases > 0 && (
-                <span className="testcase-ratio">
-                  Passed {activeSubmission.passedTestCases} / {activeSubmission.totalTestCases}
+              {activeSubmission.totalTestCases != null &&
+                activeSubmission.totalTestCases > 0 && (
+                  <span className="testcase-ratio">
+                    Passed {activeSubmission.passedTestCases} /{" "}
+                    {activeSubmission.totalTestCases}
+                  </span>
+                )}
+              {activeSubmission.scoreAwarded != null && (
+                <span className="challenge-score-chip">
+                  Score {activeSubmission.scoreAwarded.toFixed(2)}
                 </span>
               )}
             </div>
@@ -323,15 +316,21 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
                 <div className="failed-testcase-title">Testcase Failed</div>
                 <div className="testcase-row">
                   <div className="testcase-label">Input</div>
-                  <pre className="testcase-value">{activeSubmission.failedTestCase.input}</pre>
+                  <pre className="testcase-value">
+                    {activeSubmission.failedTestCase.input}
+                  </pre>
                 </div>
                 <div className="testcase-row">
                   <div className="testcase-label">Expected Output</div>
-                  <pre className="testcase-value testcase-expected">{activeSubmission.failedTestCase.expected}</pre>
+                  <pre className="testcase-value testcase-expected">
+                    {activeSubmission.failedTestCase.expected}
+                  </pre>
                 </div>
                 <div className="testcase-row">
                   <div className="testcase-label">Actual Output</div>
-                  <pre className="testcase-value testcase-actual">{activeSubmission.failedTestCase.actual}</pre>
+                  <pre className="testcase-value testcase-actual">
+                    {activeSubmission.failedTestCase.actual}
+                  </pre>
                 </div>
               </div>
             )}
@@ -345,12 +344,15 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
             {activeSubmission.stderr && (
               <div className="output-section">
                 <div className="output-label output-label-err">stderr</div>
-                <pre className="output-code output-code-err">{activeSubmission.stderr}</pre>
+                <pre className="output-code output-code-err">
+                  {activeSubmission.stderr}
+                </pre>
               </div>
             )}
 
-            {(activeSubmission.status === 'COMPLETED' || activeSubmission.status === 'FAILED') && (
-              <div style={{ marginTop: '24px' }}>
+            {(activeSubmission.status === "COMPLETED" ||
+              activeSubmission.status === "FAILED") && (
+              <div style={{ marginTop: "24px" }}>
                 <AiFeedbackPanel
                   submissionId={activeSubmission.id}
                   verdict={activeSubmission.verdict ?? undefined}
@@ -363,24 +365,28 @@ export default function SubmitPanel({ code, language, problemId, contestId }: Su
         {/* History Table */}
         {history.length > 0 && (
           <div className="history-list">
-            <h4>Recent Runs</h4>
+            <h4>Previous submissions</h4>
             <div className="history-table">
               {history.map((sub) => (
                 <div
                   key={sub.id}
-                  className={`history-row ${activeSubmission?.id === sub.id ? 'active' : ''}`}
+                  className={`history-row ${activeSubmission?.id === sub.id ? "active" : ""}`}
                   onClick={() => setActiveSubmission(sub)}
                 >
                   <div className="history-col-verdict">
-                    <span className={`status-dot ${sub.status.toLowerCase()}`}></span>
+                    <span
+                      className={`status-dot ${sub.status.toLowerCase()}`}
+                    ></span>
                     {sub.verdict || sub.status}
                   </div>
                   <div className="history-col-lang">{sub.language}</div>
                   <div className="history-col-time">
-                    {sub.executionTimeMs ? `${sub.executionTimeMs}ms` : '-'}
+                    {sub.runtimeMs ? `${sub.runtimeMs}ms` : "-"}
                   </div>
                   <div className="history-col-testcases">
-                    {sub.totalTestCases ? `${sub.passedTestCases}/${sub.totalTestCases}` : '-'}
+                    {sub.totalTestCases
+                      ? `${sub.passedTestCases}/${sub.totalTestCases}`
+                      : "-"}
                   </div>
                 </div>
               ))}

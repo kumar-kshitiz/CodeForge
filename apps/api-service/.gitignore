@@ -1,0 +1,22 @@
+# Dependencies
+/node_modules/
+
+# Build and compiler output
+/dist/
+/.turbo/
+/coverage/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env*
+!.env.example
+!.env.*.example
+
+# Runtime and debug output
+*.log
+*.pid
+*.pid.lock
+.eslintcache
+
+# Generated from prisma/schema.prisma
+/prisma/ERD.svg

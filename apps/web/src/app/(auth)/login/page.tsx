@@ -38,7 +38,7 @@ export default function LoginPage() {
       }
 
       setAuth(data.user, data.accessToken);
-      router.push('/rooms');
+      router.push('/');
     } catch {
       setError('Network error');
     } finally {
@@ -49,8 +49,9 @@ export default function LoginPage() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1>Welcome Back</h1>
-        <p className="auth-subtitle">Log in to continue to CodeForge.</p>
+        <span className="eyebrow">LET’S PICK UP WHERE YOU LEFT OFF</span>
+        <h1>Hey, curious mind.</h1>
+        <p className="auth-subtitle">Your next lightbulb moment is waiting for you.</p>
 
         {error && <div className="auth-error">{error}</div>}
 
@@ -89,7 +90,7 @@ export default function LoginPage() {
         </form>
 
         <div className="auth-footer">
-          Don't have an account? <Link href="/register">Sign up</Link>
+          Don’t have an account? <Link href="/register">Sign up</Link>
         </div>
       </div>
     </div>

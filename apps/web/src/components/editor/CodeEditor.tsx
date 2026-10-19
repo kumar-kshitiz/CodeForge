@@ -1,17 +1,20 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import { useRef, useCallback } from 'react';
-import type { editor } from 'monaco-editor';
+import dynamic from "next/dynamic";
+import { useRef, useCallback } from "react";
+import type { editor } from "monaco-editor";
+import { useTheme } from "../../hooks/useTheme";
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+});
 
 const MONACO_LANG_MAP: Record<string, string> = {
-  javascript: 'javascript',
-  typescript: 'typescript',
-  python: 'python',
-  java: 'java',
-  cpp: 'cpp',
+  javascript: "javascript",
+  typescript: "typescript",
+  python: "python",
+  java: "java",
+  cpp: "cpp",
 };
 
 interface CodeEditorProps {
@@ -21,29 +24,38 @@ interface CodeEditorProps {
   readOnly?: boolean;
 }
 
-export default function CodeEditor({ value, language, onChange, readOnly = false }: CodeEditorProps) {
+export default function CodeEditor({
+  value,
+  language,
+  onChange,
+  readOnly = false,
+}: CodeEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const { theme } = useTheme();
 
-  const handleMount = useCallback((editorInstance: editor.IStandaloneCodeEditor) => {
-    editorRef.current = editorInstance;
-  }, []);
+  const handleMount = useCallback(
+    (editorInstance: editor.IStandaloneCodeEditor) => {
+      editorRef.current = editorInstance;
+    },
+    [],
+  );
 
   const handleChange = useCallback(
     (val: string | undefined) => {
-      onChange(val ?? '');
+      onChange(val ?? "");
     },
-    [onChange]
+    [onChange],
   );
 
   return (
     <div className="editor-wrapper">
       <MonacoEditor
         height="100%"
-        language={MONACO_LANG_MAP[language] ?? 'javascript'}
+        language={MONACO_LANG_MAP[language] ?? "javascript"}
         value={value}
         onChange={handleChange}
         onMount={handleMount}
-        theme="vs-dark"
+        theme={theme === "dark" ? "vs-dark" : "light"}
         options={{
           fontSize: 14,
           fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -53,10 +65,10 @@ export default function CodeEditor({ value, language, onChange, readOnly = false
           readOnly,
           automaticLayout: true,
           tabSize: 2,
-          wordWrap: 'on',
-          lineNumbers: 'on',
-          renderLineHighlight: 'line',
-          cursorBlinking: 'smooth',
+          wordWrap: "on",
+          lineNumbers: "on",
+          renderLineHighlight: "line",
+          cursorBlinking: "smooth",
           smoothScrolling: true,
           padding: { top: 16, bottom: 16 },
         }}

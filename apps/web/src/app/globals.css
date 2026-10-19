@@ -744,7 +744,8 @@ body {
   padding: 8px 16px;
 }
 
-.btn-run {
+.btn-run,
+.btn-submit {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -761,7 +762,12 @@ body {
 }
 
 .btn-run:hover:not(:disabled) { background: #059669; }
-.btn-run:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-submit {
+  background: #6d4aff;
+}
+.btn-submit:hover:not(:disabled) { background: #5836e8; }
+.btn-run:disabled,
+.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .spinner {
   width: 14px;

@@ -9,8 +9,6 @@ export class RunnerFactory {
     javascript: new JavascriptRunner(),
     python: new PythonRunner(),
     cpp: new CppRunner(),
-    // Fallback aliases
-    typescript: new JavascriptRunner(), // For now, TS is executed as JS or needs a pre-compile step (we can use ts-node in future)
   };
 
   static getRunner(language: SupportedLanguage | string): LanguageRunner {

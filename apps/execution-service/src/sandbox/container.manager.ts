@@ -1,35 +1,52 @@
-import type { SubmissionResult, TestCasePayload } from '@codeforge/shared-types';
-import { RunnerFactory } from '../runners/runner.factory';
+import type {
+  SubmissionResult,
+  TestCasePayload,
+} from "@codeforge/shared-types";
+import { RunnerFactory } from "../runners/runner.factory";
 
 export interface ExecuteOptions {
   submissionId: string;
   code: string;
   language: string;
   problemSlug?: string;
+  timeLimitMs: number;
+  memoryLimitMb: number;
   testCases?: TestCasePayload[];
 }
 
-export async function executeCodeInSandbox(options: ExecuteOptions): Promise<SubmissionResult> {
-  const { submissionId, code, language, problemSlug, testCases } = options;
+export async function executeCodeInSandbox(
+  options: ExecuteOptions,
+): Promise<SubmissionResult> {
+  const {
+    submissionId,
+    code,
+    language,
+    problemSlug,
+    timeLimitMs,
+    memoryLimitMb,
+    testCases,
+  } = options;
 
   try {
     const runner = RunnerFactory.getRunner(language);
-    
+
     // The runner (via BaseRunner) handles workspace creation, timeout, and cleanup
     const result = await runner.execute({
       submissionId,
       code,
       problemSlug,
-      testCases
+      timeLimitMs,
+      memoryLimitMb,
+      testCases,
     });
 
     return result as SubmissionResult;
   } catch (err: any) {
     return {
-      verdict: 'runtime_error',
-      stdout: '',
+      verdict: "runtime_error",
+      stdout: "",
       stderr: `Internal Execution Error: ${err.message}`,
-      executionTimeMs: 0,
+      runtimeMs: 0,
     };
   }
 }

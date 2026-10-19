@@ -1,73 +1,121 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../store/authStore';
+import Link from "next/link";
+import CodePlayground from "../components/common/CodePlayground";
 
 export default function Home() {
-  const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
-
   return (
-    <div className="landing">
-
-      <main className="landing-hero">
-        <div className="hero-glow" />
-        <div className="hero-content">
-          <span className="hero-chip">Phase 3 · Realtime Collaboration</span>
-          <h1 className="hero-heading">
-            Code Together,<br />
-            <span className="gradient-text">Hire Smarter</span>
+    <div className="playful-home">
+      <section className="play-hero">
+        <div className="play-hero-copy">
+          <span className="eyebrow">
+            <span className="little-star">✳</span> A LITTLE PRACTICE. A LOT OF
+            POSSIBILITY.
+          </span>
+          <h1>
+            Big ideas.
+            <br />
+            Better code.
+            <br />
+            <span>Your next level.</span>
           </h1>
-          <p className="hero-desc">
-            Real-time collaborative code editor for technical interviews.
-            Powered by Socket.IO, Monaco, and Redis.
+          <p>
+            A happy place to challenge your brain, sharpen your skills, and turn
+            “almost” into “nailed it.” One coding challenge at a time.
           </p>
           <div className="hero-actions">
-            {!isLoading && isAuthenticated ? (
-              <button className="btn-primary-lg" onClick={() => router.push('/rooms')}>
-                Open Interview Rooms
-              </button>
-            ) : (
-              <button className="btn-primary-lg" onClick={() => router.push('/register')}>
-                Get Started
-              </button>
-            )}
+            <Link href="/problems" className="btn-primary-lg">
+              Find your challenge ↗
+            </Link>
+            <a href="#how-it-works" className="text-link">
+              Take a look around ↓
+            </a>
+          </div>
+          <div className="hero-footnote">
+            <span className="tiny-brackets">{"{ }"}</span> Your language. Your
+            pace. Your lightbulb moment.
           </div>
         </div>
-
-        <div className="editor-preview">
-          <div className="editor-chrome">
-            <div className="chrome-dots">
-              <span /><span /><span />
-            </div>
-            <span className="chrome-title">main.py · CodeForge</span>
-          </div>
-          <div className="editor-body">
-            <div className="code-line"><span className="kw">def</span> <span className="fn">two_sum</span><span className="punc">(nums, target):</span></div>
-            <div className="code-line indent"><span className="kw">  seen</span> <span className="punc">= {}</span></div>
-            <div className="code-line indent"><span className="kw">  for</span> i, n <span className="kw">in</span> <span className="fn">enumerate</span>(nums):</div>
-            <div className="code-line indent2"><span className="kw">    if</span> target - n <span className="kw">in</span> seen:</div>
-            <div className="code-line indent3"><span className="kw">      return</span> [seen[target - n], i]</div>
-            <div className="code-line indent2">seen[n] = i</div>
-            <div className="code-cursor" />
-          </div>
-        </div>
-      </main>
-
-      <section className="features">
-        {[
-          { icon: '⚡', title: 'Sub-100ms Sync', desc: 'Throttled code broadcast via Socket.IO rooms' },
-          { icon: '👥', title: 'Live Presence', desc: 'See who is in the room with avatar indicators' },
-          { icon: '💾', title: 'Auto-Save', desc: 'Debounced snapshots saved to PostgreSQL every 3s' },
-          { icon: '🔄', title: 'Reconnect', desc: 'Seamless rejoining with Redis-cached code state' },
-        ].map((f) => (
-          <div key={f.title} className="feature-card">
-            <div className="feature-icon">{f.icon}</div>
-            <h3 className="feature-title">{f.title}</h3>
-            <p className="feature-desc">{f.desc}</p>
-          </div>
-        ))}
+        <CodePlayground />
       </section>
+      <div className="language-ribbon">
+        <span>GOOD IDEAS SPEAK MANY LANGUAGES</span>
+        <b>
+          JavaScript <i>✳</i> Python <i>✳</i> C++ <i>✳</i> Your next
+          breakthrough
+        </b>
+      </div>
+      <section className="journey-section" id="how-it-works">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">LESS GUESSWORK. MORE “GOT IT.”</span>
+            <h2>
+              Get a little better.
+              <br />
+              Have a little fun.
+            </h2>
+          </div>
+          <p>
+            From your first attempt to your best solution, there’s something to
+            learn at every step.
+          </p>
+        </div>
+        <div className="journey-grid">
+          {[
+            [
+              "01",
+              "mint",
+              "⌘",
+              "Meet your next challenge",
+              "Stretch your problem-solving muscles with challenges that turn the fundamentals into second nature.",
+            ],
+            [
+              "02",
+              "peach",
+              ">_",
+              "Make something click",
+              "Write real code in your browser. Explore an idea, test your logic, and give those edge cases a little attention.",
+            ],
+            [
+              "03",
+              "lilac",
+              "✳",
+              "Find your aha! moment",
+              "Get AI-powered feedback on your approach, complexity, and readability. Take a useful lesson into your next attempt.",
+            ],
+          ].map(([number, color, icon, title, description]) => (
+            <article className={`journey-card ${color}`} key={number}>
+              <div className="card-top">
+                <span className="feature-symbol">{icon}</span>
+                <span>{number} /</span>
+              </div>
+              <h3>{title}</h3>
+              <p>{description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="practice-banner">
+        <span className="banner-spark" aria-hidden="true">
+          ✳
+        </span>
+        <div>
+          <span className="eyebrow">SMALL STEPS. BIG BREAKTHROUGHS.</span>
+          <h2>
+            Your next “I did it!”
+            <br />
+            starts right here.
+          </h2>
+        </div>
+        <Link href="/register" className="btn-primary-lg">
+          Let’s get coding ↗
+        </Link>
+      </section>
+      <footer className="site-footer">
+        <Link href="/" className="brand">
+          CodeForge.
+        </Link>
+        <p>Made for curious minds. Built for better code.</p>
+        <Link href="/problems">Explore challenges ↗</Link>
+      </footer>
     </div>
   );
 }

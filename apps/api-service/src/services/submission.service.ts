@@ -1,163 +1,265 @@
-import { prisma } from '../prisma/client';
-import type { CreateSubmissionInput, UpdateStatusInput } from '../validators/submission.validator';
-import { SubmissionStatus } from '@prisma/client';
-import { redisPublisher } from '../redis/pubsub';
-import { SocketEvent } from '@codeforge/shared-types';
+import { prisma } from "../prisma/client";
+import type {
+  CreateSubmissionInput,
+  UpdateStatusInput,
+} from "../validators/submission.validator";
+import { SubmissionStatus } from "@prisma/client";
+import { createInlineContentKey } from "../utils/content-key";
 
-export async function createSubmission(userId: string, input: CreateSubmissionInput) {
+export async function createSubmission(
+  userId: string,
+  input: CreateSubmissionInput,
+) {
+  const problem = await prisma.problem.findFirst({
+    where: { id: input.problemId, status: "PUBLISHED" },
+    select: {
+      id: true,
+      kind: true,
+      challengeEndsAt: true,
+      publishAfterChallenge: true,
+    },
+  });
+  const challengeEnded =
+    problem?.kind === "CHALLENGE" &&
+    Boolean(problem.challengeEndsAt && problem.challengeEndsAt <= new Date());
+  if (!problem || (challengeEnded && !problem.publishAfterChallenge)) {
+    const error = new Error("Problem not found or unavailable") as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 404;
+    throw error;
+  }
+
   const submission = await prisma.submission.create({
     data: {
       userId,
       language: input.language,
-      sourceCode: input.sourceCode,
-      problemId: input.problemId ?? null,
-      roomId: input.roomId ?? null,
-      contestId: input.contestId ?? null,
+      mode: input.mode,
+      sourceKey: createInlineContentKey(input.sourceCode),
+      problemId: input.problemId,
       status: SubmissionStatus.PENDING,
     },
   });
 
-  if (submission.roomId) {
-    redisPublisher.publish('execution-updates', JSON.stringify({
-      roomId: submission.roomId,
-      event: SocketEvent.SUBMISSION_QUEUED,
-      payload: submission,
-    }));
-  }
-
   return submission;
 }
 
-export async function getSubmissionById(id: string) {
+export async function getSubmissionById(id: string, userId: string) {
   return prisma.submission.findUnique({
-    where: { id },
-    include: {
+    where: { id, userId },
+    select: {
+      id: true,
+      problemId: true,
+      language: true,
+      mode: true,
+      scoreAwarded: true,
+      status: true,
+      verdict: true,
+      stdout: true,
+      stderr: true,
+      runtimeMs: true,
+      memoryKb: true,
+      passedTestCases: true,
+      totalTestCases: true,
+      failedTestCase: true,
+      createdAt: true,
       user: { select: { id: true, username: true } },
     },
   });
 }
 
-export async function getUserSubmissions(userId: string) {
+export async function getUserSubmissions(userId: string, problemId?: string) {
   return prisma.submission.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  });
-}
-
-export async function getRoomSubmissions(roomId: string) {
-  return prisma.submission.findMany({
-    where: { roomId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      user: { select: { id: true, username: true } },
+    where: {
+      userId,
+      mode: "SUBMIT",
+      ...(problemId ? { problemId } : {}),
     },
-    take: 50,
-  });
-}
-
-export async function updateSubmissionStatus(id: string, input: UpdateStatusInput) {
-  const submission = await (prisma as any).submission.update({
-    where: { id },
-    data: {
-      status: input.status as SubmissionStatus,
-      verdict: input.verdict,
-      stdout: input.stdout,
-      stderr: input.stderr,
-      executionTimeMs: input.executionTimeMs,
-      memory: input.memory,
-      passedTestCases: input.passedTestCases,
-      totalTestCases: input.totalTestCases,
-      failedTestCase: input.failedTestCase ? input.failedTestCase : undefined,
-      runtimeIntelligence: input.runtimeIntelligence ? input.runtimeIntelligence : undefined,
+    select: {
+      id: true,
+      problemId: true,
+      language: true,
+      mode: true,
+      scoreAwarded: true,
+      status: true,
+      verdict: true,
+      stdout: true,
+      stderr: true,
+      runtimeMs: true,
+      memoryKb: true,
+      passedTestCases: true,
+      totalTestCases: true,
+      failedTestCase: true,
+      createdAt: true,
     },
+    orderBy: { createdAt: "desc" },
+    take: 100,
   });
-
-  if (submission.roomId) {
-    let eventName = SocketEvent.SUBMISSION_PROCESSING;
-    if (submission.status === 'COMPLETED') eventName = SocketEvent.SUBMISSION_COMPLETED;
-    if (submission.status === 'FAILED') eventName = SocketEvent.SUBMISSION_FAILED;
-
-    redisPublisher.publish('execution-updates', JSON.stringify({
-      roomId: submission.roomId,
-      event: eventName,
-      payload: submission,
-    }));
-  }
-
-  if (submission.contestId && submission.problemId && (submission.status === 'COMPLETED' || submission.status === 'FAILED')) {
-    await handleContestSubmission(submission);
-  }
-
-  return submission;
 }
 
-async function handleContestSubmission(submission: any) {
-  const contestId = submission.contestId!;
-  const problemId = submission.problemId!;
-  const userId = submission.userId;
-
-  const contest = await prisma.contest.findUnique({
-    where: { id: contestId },
-    include: { problems: true },
-  });
-  if (!contest) return;
-
-  const contestProblem = contest.problems.find(p => p.problemId === problemId);
-  if (!contestProblem) return;
-
-  const participant = await prisma.contestParticipant.findUnique({
-    where: { contestId_userId: { contestId, userId } }
-  });
-  if (!participant) return;
-
-  const prevAccepted = await prisma.contestSubmission.findFirst({
-    where: { contestId, problemId, submission: { userId }, pointsAwarded: { gt: 0 } }
-  });
-
-  if (prevAccepted) return; // Already solved
-
-  let pointsAwarded = 0;
-  let penaltyTime = 0;
-
-  if (submission.verdict === 'accepted') {
-    pointsAwarded = contestProblem.points;
-    const minutesElapsed = Math.floor((submission.createdAt.getTime() - contest.startTime.getTime()) / 60000);
-    
-    const wrongSubmissions = await prisma.submission.count({
-      where: {
-        contestId, problemId, userId, status: 'FAILED',
-        createdAt: { lt: submission.createdAt }
-      }
+export async function updateSubmissionStatus(
+  id: string,
+  input: UpdateStatusInput,
+) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.submission.findUnique({
+      where: { id },
+      include: {
+        problem: {
+          include: { testCases: { select: { points: true } } },
+        },
+      },
     });
-
-    penaltyTime = minutesElapsed + (wrongSubmissions * 20);
-    
-    await prisma.contestParticipant.update({
-      where: { id: participant.id },
-      data: {
-        score: { increment: pointsAwarded },
-        penalty: { increment: penaltyTime }
-      }
-    });
-  }
-
-  await prisma.contestSubmission.create({
-    data: {
-      contestId, problemId, submissionId: submission.id, pointsAwarded, penaltyTime
+    if (!existing) {
+      const error = new Error("Submission not found") as Error & {
+        statusCode: number;
+      };
+      error.statusCode = 404;
+      throw error;
     }
-  });
 
-  // Broadcast Leaderboard Update to redis
-  const updatedParticipant = await prisma.contestParticipant.findUnique({
-    where: { id: participant.id },
-    include: { user: { select: { username: true } } }
-  });
+    let submission = await tx.submission.update({
+      where: { id },
+      data: {
+        status: input.status as SubmissionStatus,
+        verdict: input.verdict,
+        stdout: input.stdout,
+        stderr: input.stderr,
+        runtimeMs: input.runtimeMs,
+        memoryKb: input.memoryKb,
+        passedTestCases: input.passedTestCases,
+        totalTestCases: input.totalTestCases,
+        failedTestCase: input.failedTestCase ?? undefined,
+        runtimeIntelligence: input.runtimeIntelligence ?? undefined,
+      },
+    });
 
-  redisPublisher.publish('execution-updates', JSON.stringify({
-    roomId: `contest-${contestId}`,
-    event: SocketEvent.CONTEST_LEADERBOARD_UPDATE,
-    payload: updatedParticipant
-  }));
+    if (input.testResults) {
+      await tx.submissionTestResult.deleteMany({ where: { submissionId: id } });
+      if (input.testResults.length > 0) {
+        await tx.submissionTestResult.createMany({
+          data: input.testResults.map((result) => ({
+            submissionId: id,
+            testCaseId: result.testCaseId,
+            verdict: result.verdict,
+            runtimeMs: result.runtimeMs,
+            memoryKb: result.memoryKb,
+          })),
+        });
+      }
+    }
+
+    const isFirstCompletion =
+      input.status === "COMPLETED" &&
+      existing.status !== SubmissionStatus.COMPLETED &&
+      existing.status !== SubmissionStatus.FAILED;
+    const isActiveChallenge =
+      existing.problem.kind === "CHALLENGE" &&
+      Boolean(
+        existing.problem.challengeEndsAt &&
+          existing.createdAt <= existing.problem.challengeEndsAt,
+      );
+
+    if (isFirstCompletion && isActiveChallenge) {
+      const maximumScore = existing.problem.testCases.reduce(
+        (total, testCase) => total + testCase.points,
+        0,
+      );
+      const totalCases = input.totalTestCases ?? 0;
+      const passedCases = input.passedTestCases ?? 0;
+      const allPassed = totalCases > 0 && passedCases === totalCases;
+      const progress = await tx.challengeProgress.findUnique({
+        where: {
+          problemId_userId: {
+            problemId: existing.problemId,
+            userId: existing.userId,
+          },
+        },
+      });
+
+      if (existing.mode === "RUN") {
+        const runCount = (progress?.runCount ?? 0) + 1;
+        const runPenalty = Math.max(0, runCount - 1) * 0.75;
+        const currentScore = roundScore(
+          Math.max(0, maximumScore - runPenalty),
+        );
+        const firstRunPassed =
+          progress?.firstRunPassed || (runCount === 1 && allPassed);
+
+        await tx.challengeProgress.upsert({
+          where: {
+            problemId_userId: {
+              problemId: existing.problemId,
+              userId: existing.userId,
+            },
+          },
+          update: { runCount, firstRunPassed, currentScore },
+          create: {
+            problemId: existing.problemId,
+            userId: existing.userId,
+            runCount,
+            firstRunPassed,
+            currentScore,
+          },
+        });
+
+        submission = await tx.submission.update({
+          where: { id },
+          data: { scoreAwarded: currentScore },
+        });
+      } else {
+        const runCount = progress?.runCount ?? 0;
+        const firstRunPassed = progress?.firstRunPassed ?? false;
+        const runPenalty =
+          Math.max(0, runCount - 1) * 0.75 +
+          (runCount === 1 && !firstRunPassed ? 0.75 : 0);
+        const passedRatio =
+          totalCases > 0 ? Math.min(1, passedCases / totalCases) : 0;
+        const accepted = input.verdict === "accepted" && allPassed;
+        const qualifiesForFullScore =
+          accepted && (runCount === 0 || (runCount === 1 && firstRunPassed));
+        const scoreAwarded = roundScore(
+          qualifiesForFullScore
+            ? maximumScore
+            : Math.max(0, maximumScore * passedRatio - runPenalty),
+        );
+        const submissionCount = (progress?.submissionCount ?? 0) + 1;
+        const bestScore = Math.max(progress?.bestScore ?? 0, scoreAwarded);
+
+        await tx.challengeProgress.upsert({
+          where: {
+            problemId_userId: {
+              problemId: existing.problemId,
+              userId: existing.userId,
+            },
+          },
+          update: {
+            submissionCount,
+            currentScore: scoreAwarded,
+            bestScore,
+            ...(accepted && !progress?.solvedAt ? { solvedAt: new Date() } : {}),
+          },
+          create: {
+            problemId: existing.problemId,
+            userId: existing.userId,
+            submissionCount,
+            currentScore: scoreAwarded,
+            bestScore,
+            solvedAt: accepted ? new Date() : null,
+          },
+        });
+
+        submission = await tx.submission.update({
+          where: { id },
+          data: { scoreAwarded },
+        });
+      }
+    }
+
+    return submission;
+  });
 }
 
+function roundScore(score: number): number {
+  return Math.round(score * 100) / 100;
+}

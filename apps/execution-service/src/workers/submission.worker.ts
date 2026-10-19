@@ -1,15 +1,29 @@
-import { Worker, Job } from 'bullmq';
-import { createRedisConnection } from '../config/redis';
-import { QUEUE_NAME } from '../queue/queue.names';
-import { markProcessing, markCompleted, markFailed } from '../services/submission.service';
-import type { QueueJobPayload } from '@codeforge/shared-types';
+import { Worker, Job } from "bullmq";
+import { createRedisConnection } from "../config/redis";
+import { QUEUE_NAME } from "../queue/queue.names";
+import {
+  markProcessing,
+  markCompleted,
+  markFailed,
+} from "../services/submission.service";
+import type { QueueJobPayload } from "@codeforge/shared-types";
 
-import { executeCodeInSandbox } from '../sandbox/container.manager';
+import { executeCodeInSandbox } from "../sandbox/container.manager";
 
 async function processJob(job: Job<QueueJobPayload>): Promise<void> {
-  const { submissionId, language, sourceCode, problemSlug, testCases } = job.data;
+  const {
+    submissionId,
+    language,
+    sourceCode,
+    problemSlug,
+    timeLimitMs,
+    memoryLimitMb,
+    testCases,
+  } = job.data;
 
-  console.log(`[worker] job ${job.id} | lang=${language} | submission=${submissionId} | slug=${problemSlug} | testcases=${testCases?.length || 0}`);
+  console.log(
+    `[worker] job ${job.id} | lang=${language} | submission=${submissionId} | slug=${problemSlug} | testcases=${testCases?.length || 0}`,
+  );
 
   await markProcessing(submissionId);
 
@@ -18,12 +32,16 @@ async function processJob(job: Job<QueueJobPayload>): Promise<void> {
     code: sourceCode,
     language,
     problemSlug,
+    timeLimitMs,
+    memoryLimitMb,
     testCases,
   });
 
   await markCompleted(submissionId, result);
 
-  console.log(`[worker] job ${job.id} completed for submission ${submissionId}`);
+  console.log(
+    `[worker] job ${job.id} completed for submission ${submissionId}`,
+  );
 }
 
 export function createSubmissionWorker(): Worker<QueueJobPayload> {
@@ -34,23 +52,23 @@ export function createSubmissionWorker(): Worker<QueueJobPayload> {
     concurrency: Number(process.env.WORKER_CONCURRENCY ?? 4),
   });
 
-  worker.on('completed', (job) => {
+  worker.on("completed", (job) => {
     console.log(`[worker] ✓ job ${job.id} done`);
   });
 
-  worker.on('failed', async (job, err) => {
+  worker.on("failed", async (job, err) => {
     console.error(`[worker] ✗ job ${job?.id} failed: ${err.message}`);
     if (job?.data.submissionId) {
       await markFailed(job.data.submissionId, err.message).catch(() => null);
     }
   });
 
-  process.on('SIGTERM', async () => {
-    console.log('[worker] shutting down...');
-    await worker.close();
-    connection.disconnect();
-    console.log('[worker] shutdown complete');
-  });
+  // process.on('SIGTERM', async () => {
+  //   console.log('[worker] shutting down...');
+  //   await worker.close();
+  //   connection.disconnect();
+  //   console.log('[worker] shutdown complete');
+  // });
 
   return worker;
 }

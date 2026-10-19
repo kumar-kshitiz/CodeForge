@@ -44,7 +44,7 @@ export default function RegisterPage() {
       }
 
       setAuth(data.user, data.accessToken);
-      router.push('/rooms');
+      router.push('/problems');
     } catch {
       setError('Network error');
     } finally {
@@ -55,8 +55,9 @@ export default function RegisterPage() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1>Create Account</h1>
-        <p className="auth-subtitle">Join CodeForge to start collaborating.</p>
+        <span className="eyebrow">YOUR NEXT CHAPTER</span>
+        <h1>Big things start small.</h1>
+        <p className="auth-subtitle">Make a little space for your next breakthrough.</p>
 
         {error && <div className="auth-error">{error}</div>}
 

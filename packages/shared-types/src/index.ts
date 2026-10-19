@@ -1,6 +1,6 @@
 // ─── User ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'interviewer' | 'candidate';
+export type UserRole = "admin" | "interviewer" | "candidate";
 
 export interface User {
   id: string;
@@ -10,59 +10,64 @@ export interface User {
   createdAt: Date;
 }
 
-// ─── Room ────────────────────────────────────────────────────────────────────
-
-export type RoomStatus = 'waiting' | 'active' | 'ended';
-
-export interface Room {
-  id: string;
-  name: string;
-  hostId: string;
-  participantIds: string[];
-  status: RoomStatus;
-  problemId: string | null;
-  createdAt: Date;
-}
-
 // ─── Problem ─────────────────────────────────────────────────────────────────
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = "easy" | "medium" | "hard";
 
 export interface Problem {
   id: string;
+  slug: string;
   title: string;
-  description: string;
   difficulty: Difficulty;
-  constraints: string;
+  statementMd: string;
+  constraintsMd: string;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  version: number;
+  kind: "QUESTION" | "CHALLENGE";
+  challengeEndsAt?: Date | string | null;
+  publishAfterChallenge: boolean;
   examples: ProblemExample[];
-  starterCode: Record<string, string>;
+  starterCode?: Record<string, string>;
 }
 
 export interface ProblemExample {
-  input: string;
-  output: string;
+  id: string;
+  inputText: string;
+  outputText: string;
   explanation?: string;
+  position: number;
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
-export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' | 'cpp';
+export type SupportedLanguage = "javascript" | "python" | "cpp";
 
-export type SubmissionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type SubmissionStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
 
 export interface TestCasePayload {
+  id: string;
   input: string;
   expectedOutput: string;
-  isHidden: boolean;
+  visibility: "PUBLIC" | "HIDDEN";
+  points: number;
+  position: number;
+  groupId?: string;
 }
 
 export interface QueueJobPayload {
   submissionId: string;
   userId: string;
-  roomId?: string;
   language: SupportedLanguage;
   sourceCode: string;
   problemSlug?: string;
+  timeLimitMs: number;
+  memoryLimitMb: number;
   testCases?: TestCasePayload[];
 }
 
@@ -76,17 +81,23 @@ export interface SubmissionResult {
   verdict: Verdict;
   stdout: string;
   stderr: string;
-  executionTimeMs: number;
-  memoryUsed?: string;
+  runtimeMs: number;
+  memoryKb?: number;
   passedTestCases?: number;
   totalTestCases?: number;
   failedTestCase?: FailedTestCase;
+  testResults?: SubmissionTestResultPayload[];
 }
 
+export interface SubmissionTestResultPayload {
+  testCaseId: string;
+  verdict: Verdict;
+  runtimeMs?: number;
+  memoryKb?: number;
+}
 
 export interface ExecutionJob {
   submissionId: string;
-  roomId: string;
   userId: string;
   language: SupportedLanguage;
   code: string;
@@ -105,7 +116,14 @@ export interface ExecutionResult {
 
 // ─── Submission ──────────────────────────────────────────────────────────────
 
-export type Verdict = 'accepted' | 'wrong_answer' | 'time_limit_exceeded' | 'runtime_error' | 'compilation_error' | 'pending';
+export type Verdict =
+  | "accepted"
+  | "wrong_answer"
+  | "time_limit_exceeded"
+  | "memory_limit_exceeded"
+  | "runtime_error"
+  | "compilation_error"
+  | "pending";
 
 export interface JudgeResult {
   submissionId: string;
@@ -115,59 +133,3 @@ export interface JudgeResult {
   passedCases: number;
   totalCases: number;
 }
-
-// ─── Socket Events ───────────────────────────────────────────────────────────
-
-export enum SocketEvent {
-  JOIN_ROOM      = 'room:join',
-  LEAVE_ROOM     = 'room:leave',
-  USER_JOINED    = 'room:user_joined',
-  USER_LEFT      = 'room:user_left',
-  PARTICIPANTS   = 'room:participants',
-  CODE_CHANGE    = 'code:change',
-  CODE_UPDATE    = 'code:update',
-  LANGUAGE_CHANGE = 'language:change',
-  LANGUAGE_UPDATE = 'language:update',
-  CURSOR_UPDATE  = 'cursor:update',
-  ROOM_SNAPSHOT  = 'room:snapshot',
-  EXECUTION_STARTED = 'execution:started',
-  EXECUTION_RESULT  = 'execution:result',
-  SUBMISSION_QUEUED = 'submission:queued',
-  SUBMISSION_PROCESSING = 'submission:processing',
-  SUBMISSION_COMPLETED = 'submission:completed',
-  SUBMISSION_FAILED = 'submission:failed',
-  CHAT_MESSAGE   = 'chat:message',
-  CONTEST_LEADERBOARD_UPDATE = 'contest:leaderboard_update',
-}
-
-export interface RoomUser {
-  socketId: string;
-  userId: string;
-  username: string;
-}
-
-export interface JoinRoomPayload {
-  roomId: string;
-  userId: string;
-  username: string;
-}
-
-export interface CodePayload {
-  roomId: string;
-  code: string;
-  language: string;
-}
-
-export interface LangPayload {
-  roomId: string;
-  language: string;
-}
-
-export interface CursorPayload {
-  roomId: string;
-  userId: string;
-  username: string;
-  line: number;
-  column: number;
-}
-
