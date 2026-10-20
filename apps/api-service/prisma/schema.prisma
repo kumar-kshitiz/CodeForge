@@ -148,6 +148,7 @@ model Submission {
   language            String
   mode                String                   @default("SUBMIT") @map("execution_mode")
   scoreAwarded        Float?                   @map("score_awarded")
+  teamMatchId         String?                  @map("team_match_id")
   sourceKey           String                   @map("source_key") @db.Text
   status              SubmissionStatus         @default(PENDING)
   verdict             String?
@@ -169,6 +170,7 @@ model Submission {
   @@index([userId, createdAt])
   @@index([problemId, createdAt])
   @@index([userId, problemId, mode, createdAt])
+  @@index([teamMatchId])
   @@map("submissions")
 }
 
@@ -236,6 +238,21 @@ model SubmissionErrorFeedback {
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@map("submission_error_feedbacks")
+}
+
+model AbilityPuzzle {
+  id            String   @id @default(cuid())
+  prompt         String   @db.Text
+  options        Json?
+  correctOption  Int?     @map("correct_option")
+  answerText     String?  @map("answer_text")
+  explanation    String?  @db.Text
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("ability_puzzles")
 }
 
 model RefreshToken {

@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
   use,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
@@ -12,8 +13,11 @@ import Editor from "@monaco-editor/react";
 import SubmitPanel from "@/components/room/SubmitPanel";
 import Link from "next/link";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuthStore } from "@/store/authStore";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Keep pending saves ordered even when navigation remounts the workspace.
+const draftSaveQueue = { current: Promise.resolve() as Promise<void> };
 
 interface Problem {
   id: string;
@@ -50,14 +54,23 @@ export default function ProblemWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ contestId?: string; mode?: string }>;
+  searchParams: Promise<{ contestId?: string; mode?: string; teamMatchId?: string }>;
 }) {
   const { slug } = use(params);
-  const { contestId, mode } = use(searchParams);
+  const { contestId, mode, teamMatchId } = use(searchParams);
   const isShuffleMode = mode === "shuffle";
   const [problem, setProblem] = useState<Problem | null>(null);
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState("");
+  const userId = useAuthStore((state) => state.user?.id);
+  const [preferenceOwner, setPreferenceOwner] = useState<string>();
+  const [loadedDraftKey, setLoadedDraftKey] = useState("");
+  const [draftError, setDraftError] = useState("");
+  const [draftRetry, setDraftRetry] = useState(0);
+  const [resettingCode, setResettingCode] = useState(false);
+  const [topicsRevealed, setTopicsRevealed] = useState(false);
+  const draftKey = `${userId}:${slug}:${language}`;
+  const draftReady = preferenceOwner === userId && !!userId && loadedDraftKey === draftKey;
   const [loading, setLoading] = useState(true);
   const [statementWidth, setStatementWidth] = useState(42);
   const [resultsHeight, setResultsHeight] = useState(34);
@@ -67,52 +80,140 @@ export default function ProblemWorkspacePage({
 
   // Autosave draft logic
   const saveDraftTimeout = useRef<NodeJS.Timeout | null>(null);
+  const pendingDraft = useRef<{ slug: string; language: string; code: string; token: string } | null>(null);
+  const saveQueue = draftSaveQueue;
+
+  const flushDraft = useCallback(() => {
+    if (saveDraftTimeout.current) clearTimeout(saveDraftTimeout.current);
+    const draft = pendingDraft.current;
+    pendingDraft.current = null;
+    if (!draft) return;
+    saveQueue.current = saveQueue.current.then(async () => {
+      const response = await fetch(`${API}/api/problems/${draft.slug}/draft`, {
+        method: "PUT",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${draft.token}` },
+        body: JSON.stringify({ language: draft.language, code: draft.code }),
+      });
+      if (!response.ok) throw new Error("Could not save draft");
+    }).catch((error) => console.error("Failed to save draft", error));
+  }, []);
 
   useEffect(() => {
+    setTopicsRevealed(false);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let preferred = "javascript";
+    try {
+      const saved = localStorage.getItem(`codeforge:language:${userId}`);
+      if (saved && ["javascript", "python", "cpp"].includes(saved)) preferred = saved;
+    } catch { /* Storage may be unavailable; keep the default. */ }
+    setLanguage(preferred);
+    setPreferenceOwner(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    window.addEventListener("pagehide", flushDraft);
+    return () => {
+      window.removeEventListener("pagehide", flushDraft);
+      flushDraft();
+    };
+  }, [flushDraft]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setProblem(null);
     fetch(`${API}/api/problems/${slug}`, {
+      signal: controller.signal,
       headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data.problem) setProblem(data.problem);
+        if (!controller.signal.aborted && data.problem) setProblem(data.problem);
       })
-      .catch(() => setProblem(null))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!controller.signal.aborted) setProblem(null); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [slug]);
 
   // Load draft when problem or language changes
   useEffect(() => {
-    if (!problem) return;
-    fetch(`${API}/api/problems/${slug}/draft?language=${language}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
+    if (!problem || problem.slug !== slug || !userId || preferenceOwner !== userId) return;
+    const controller = new AbortController();
+    setLoadedDraftKey("");
+    setDraftError("");
+    flushDraft();
+    saveQueue.current.then(() => {
+      if (controller.signal.aborted) return;
+      return fetch(`${API}/api/problems/${slug}/draft?language=${language}`, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${getToken()}` },
+      }).then((res) => {
+        if (!res.ok) throw new Error("Could not load draft");
+        return res.json();
+      });
     })
-      .then((res) => res.json())
       .then((data) => {
-        if (data.draft?.code) {
-          setCode(data.draft.code);
-        } else {
-          setCode(problem.starterCode?.[language] || "");
-        }
+        if (controller.signal.aborted) return;
+        setCode(data?.draft?.code ?? problem.starterCode?.[language] ?? "");
+        setLoadedDraftKey(draftKey);
       })
-      .catch(() => setCode(problem.starterCode?.[language] || ""));
-  }, [problem, language, slug]);
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setDraftError("Could not load your saved code. Please try again.");
+        }
+      });
+    return () => { controller.abort(); flushDraft(); };
+  }, [problem, language, slug, userId, preferenceOwner, draftKey, flushDraft, draftRetry]);
+
+  const changeLanguage = (nextLanguage: string) => {
+    flushDraft();
+    setLoadedDraftKey("");
+    setCode("");
+    setLanguage(nextLanguage);
+    if (userId) {
+      try { localStorage.setItem(`codeforge:language:${userId}`, nextLanguage); }
+      catch { /* The selection still works for this visit. */ }
+    }
+  };
+
+  const resetCode = async () => {
+    if (!problem || !draftReady || resettingCode) return;
+    setResettingCode(true);
+    setDraftError("");
+    if (saveDraftTimeout.current) clearTimeout(saveDraftTimeout.current);
+    pendingDraft.current = null;
+
+    try {
+      await saveQueue.current;
+      const response = await fetch(
+        `${API}/api/problems/${slug}/draft?language=${encodeURIComponent(language)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      if (!response.ok) throw new Error("Could not reset your code");
+      setCode(problem.starterCode?.[language] ?? "");
+    } catch {
+      setDraftError("Could not reset your code. Please try again.");
+    } finally {
+      setResettingCode(false);
+    }
+  };
 
   const handleCodeChange = (value: string | undefined) => {
+    if (!draftReady) return;
     const newCode = value || "";
     setCode(newCode);
 
     // Debounced Autosave (1 second)
     if (saveDraftTimeout.current) clearTimeout(saveDraftTimeout.current);
-    saveDraftTimeout.current = setTimeout(() => {
-      fetch(`${API}/api/problems/${slug}/draft`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ language, code: newCode }),
-      }).catch((err) => console.error("Failed to save draft", err));
-    }, 1000);
+    pendingDraft.current = { slug, language, code: newCode, token: getToken() };
+    saveDraftTimeout.current = setTimeout(flushDraft, 1000);
   };
 
   const beginStatementResize = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -202,7 +303,7 @@ export default function ProblemWorkspacePage({
                 ← Back to Contest
               </Link>
             ) : (
-              <Link href="/problems" className="back-link">
+              <Link href={isShuffleMode ? "/problems?mode=shuffle" : "/problems"} className="back-link">
                 ← Back
               </Link>
             )}
@@ -237,11 +338,6 @@ export default function ProblemWorkspacePage({
                 {problem.difficulty}
               </span>
             )}
-            {problem.tags.map((t) => (
-              <span key={t.name} className="tag-badge">
-                {t.name}
-              </span>
-            ))}
           </div>
           {problem.kind === "CHALLENGE" && problem.challengeEndsAt && (
             <p className="challenge-deadline">
@@ -277,6 +373,32 @@ export default function ProblemWorkspacePage({
               <h3>Constraints</h3>
               <div className="problem-desc">{problem.constraintsMd}</div>
             </div>
+          )}
+
+          {!isShuffleMode && problem.tags.length > 0 && (
+            <section className={`topic-envelope ${topicsRevealed ? "open" : ""}`}>
+              <button
+                type="button"
+                className="topic-envelope-trigger"
+                aria-expanded={topicsRevealed}
+                aria-controls="problem-topics"
+                onClick={() => setTopicsRevealed((current) => !current)}
+              >
+                <span className="topic-envelope-visual" aria-hidden="true" />
+                <span className="topic-envelope-copy">
+                    <small>TOPICS</small>
+                  <strong>{topicsRevealed ? "Topics revealed" : "Open the topic envelope"}</strong>
+                </span>
+                <span className="topic-envelope-action">
+                  {topicsRevealed ? "Close ↑" : "Reveal ↗"}
+                </span>
+              </button>
+              <div id="problem-topics" className="topic-envelope-content" hidden={!topicsRevealed}>
+                <div>
+                  {problem.tags.map((tag) => <span key={tag.name}>{tag.name}</span>)}
+                </div>
+              </div>
+            </section>
           )}
         </div>
       </div>
@@ -314,16 +436,29 @@ export default function ProblemWorkspacePage({
               className="lang-select"
               aria-label="Programming language"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => changeLanguage(e.target.value)}
+              disabled={!userId || preferenceOwner !== userId}
             >
               <option value="javascript">JavaScript</option>
               <option value="python">Python</option>
               <option value="cpp">C++</option>
             </select>
             <div className="editor-toolbar-actions">
-              <span className="save-status text-muted text-sm">
-                Your space to experiment ✳
+              <span
+                className="save-status text-muted text-sm"
+                role={draftError ? "alert" : undefined}
+              >
+                {draftError || "Your space to experiment ✳"}
               </span>
+              <button
+                type="button"
+                className="reset-code-button"
+                onClick={resetCode}
+                disabled={!draftReady || resettingCode}
+                title={`Restore the ${language} starter code`}
+              >
+                {resettingCode ? "Resetting…" : "Reset code"}
+              </button>
               <div className="panel-size-controls" aria-label="Code editor size">
                 <button
                   type="button"
@@ -346,7 +481,8 @@ export default function ProblemWorkspacePage({
           </div>
 
           <div className="editor-wrapper">
-            <Editor
+            {draftReady ? <Editor
+              path={`${userId}/${slug}/${language}`}
               height="100%"
               language={language === "cpp" ? "cpp" : language}
               theme={theme === "dark" ? "vs-dark" : "light"}
@@ -358,7 +494,12 @@ export default function ProblemWorkspacePage({
                 padding: { top: 16 },
                 scrollBeyondLastLine: false,
               }}
-            />
+            /> : draftError ? (
+              <div role="alert">
+                <p>{draftError}</p>
+                <button type="button" onClick={() => setDraftRetry((value) => value + 1)}>Retry</button>
+              </div>
+            ) : <div role="status">Loading your code…</div>}
           </div>
         </div>
 
@@ -407,7 +548,12 @@ export default function ProblemWorkspacePage({
         </div>
 
         <div className="workspace-submit-wrapper">
-          <SubmitPanel code={code} language={language} problemId={problem.id} />
+          {draftReady && <SubmitPanel
+            code={code}
+            language={language}
+            problemId={problem.id}
+            teamMatchId={teamMatchId}
+          />}
         </div>
       </div>
     </div>

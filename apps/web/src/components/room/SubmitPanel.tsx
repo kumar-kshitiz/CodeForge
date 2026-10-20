@@ -7,6 +7,7 @@ interface SubmitPanelProps {
   code: string;
   language: string;
   problemId?: string;
+  teamMatchId?: string;
 }
 
 type Status =
@@ -49,6 +50,7 @@ export default function SubmitPanel({
   code,
   language,
   problemId,
+  teamMatchId,
 }: SubmitPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<SubmissionHistory[]>([]);
@@ -110,7 +112,13 @@ export default function SubmitPanel({
           "Content-Type": "application/json",
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ language, sourceCode: code, problemId, mode }),
+        body: JSON.stringify({
+          language,
+          sourceCode: code,
+          problemId,
+          mode,
+          ...(teamMatchId ? { teamMatchId } : {}),
+        }),
       });
 
       if (!res.ok) {

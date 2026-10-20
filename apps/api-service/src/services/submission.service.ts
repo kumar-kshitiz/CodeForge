@@ -37,6 +37,7 @@ export async function createSubmission(
       mode: input.mode,
       sourceKey: createInlineContentKey(input.sourceCode),
       problemId: input.problemId,
+      teamMatchId: input.teamMatchId,
       status: SubmissionStatus.PENDING,
     },
   });
@@ -53,6 +54,7 @@ export async function getSubmissionById(id: string, userId: string) {
       language: true,
       mode: true,
       scoreAwarded: true,
+      teamMatchId: true,
       status: true,
       verdict: true,
       stdout: true,
@@ -81,6 +83,7 @@ export async function getUserSubmissions(userId: string, problemId?: string) {
       language: true,
       mode: true,
       scoreAwarded: true,
+      teamMatchId: true,
       status: true,
       verdict: true,
       stdout: true,

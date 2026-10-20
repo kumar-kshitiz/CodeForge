@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "../../store/authStore";
 import CodePlayground from "../../components/common/CodePlayground";
 
 export default function AuthLayout({
@@ -5,6 +10,22 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) router.replace("/problems");
+  }, [isLoading, isAuthenticated, router]);
+
+  // Keep guest forms hidden until the existing session has been checked.
+  if (isLoading || isAuthenticated) {
+    return (
+      <div className="empty-state" role="status">
+        {isLoading ? "Checking your session…" : "Opening your challenges…"}
+      </div>
+    );
+  }
+
   return (
     <div className="auth-layout">
       <aside className="auth-story">

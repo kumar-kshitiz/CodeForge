@@ -29,9 +29,19 @@ junit.xml
 .env.*
 !.env.example
 !.env.*.example
+.envrc
+.direnv/
 *.key
 *.crt
 *.p12
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+*.sqlite3
+*.sqlite3-journal
 
 # Tool caches
 .turbo
@@ -58,6 +68,9 @@ Thumbs.db
 # Editor
 .vscode
 .idea
+*.swp
+*.swo
+*~
 
 # Docker
 docker/volumes/

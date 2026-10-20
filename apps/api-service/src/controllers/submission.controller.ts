@@ -18,6 +18,33 @@ export async function createSubmission(
 ): Promise<void> {
   try {
     const input = createSubmissionSchema.parse(req.body);
+    if (input.teamMatchId) {
+      const validation = await fetch(
+        `${env.teamCompetitionServiceUrl}/api/matches/internal/validate-submission`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-key": env.internalServiceKey,
+          },
+          body: JSON.stringify({
+            matchId: input.teamMatchId,
+            userId: req.user!.id,
+            problemId: input.problemId,
+          }),
+        },
+      );
+      if (!validation.ok) {
+        const data = (await validation.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        const error = new Error(
+          data.error ?? "Team match submission is not allowed",
+        ) as Error & { statusCode: number };
+        error.statusCode = validation.status === 403 ? 403 : 409;
+        throw error;
+      }
+    }
     const submission = await submissionService.createSubmission(
       req.user!.id,
       input,
@@ -125,6 +152,29 @@ export async function updateStatus(
       req.params.id,
       input,
     );
+    if (
+      input.status === "COMPLETED" &&
+      submission.mode === "SUBMIT" &&
+      submission.teamMatchId
+    ) {
+      fetch(`${env.teamCompetitionServiceUrl}/api/matches/internal/scores`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-key": env.internalServiceKey,
+        },
+        body: JSON.stringify({
+          matchId: submission.teamMatchId,
+          userId: submission.userId,
+          problemId: submission.problemId,
+          passedTestCases: input.passedTestCases ?? 0,
+          totalTestCases: input.totalTestCases ?? 0,
+          verdict: input.verdict,
+        }),
+      }).catch((error) => {
+        console.error("Failed to report team match score", error);
+      });
+    }
     res.json({ submission });
   } catch (err) {
     next(err);

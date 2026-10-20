@@ -8,6 +8,8 @@
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
+    "seed:catalog": "ts-node prisma/seed-question-catalog.ts",
+    "seed:challenge": "ts-node prisma/insert-balanced-binary-challenge.ts",
     "test": "jest --passWithNoTests --coverage",
     "lint": "eslint src/"
   },

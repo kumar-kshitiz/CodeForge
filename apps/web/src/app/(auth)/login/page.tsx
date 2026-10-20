@@ -38,7 +38,7 @@ export default function LoginPage() {
       }
 
       setAuth(data.user, data.accessToken);
-      router.push('/');
+      router.replace('/problems');
     } catch {
       setError('Network error');
     } finally {

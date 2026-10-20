@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import type { CreateProblemInput } from "../validators/problem.validator";
 import { createInlineContentKey } from "../utils/content-key";
@@ -59,10 +60,18 @@ export async function createProblem(input: CreateProblemInput) {
   });
 }
 
-export async function listProblems() {
+export interface ProblemListOptions {
+  page: number;
+  limit: number;
+  type: "all" | "questions" | "challenges";
+  difficulty?: string;
+  query?: string;
+  userId: string;
+}
+
+export async function listProblems(options: ProblemListOptions) {
   const now = new Date();
-  const problems = await prisma.problem.findMany({
-    where: {
+  const available: Prisma.ProblemWhereInput = {
       status: "PUBLISHED",
       OR: [
         { kind: "QUESTION" },
@@ -73,7 +82,39 @@ export async function listProblems() {
           publishAfterChallenge: true,
         },
       ],
-    },
+  };
+  const typeFilter: Prisma.ProblemWhereInput = options.type === "challenges"
+    ? { kind: "CHALLENGE", challengeEndsAt: { gt: now } }
+    : options.type === "questions"
+      ? {
+          OR: [
+            { kind: "QUESTION" },
+            { kind: "CHALLENGE", challengeEndsAt: { lte: now }, publishAfterChallenge: true },
+          ],
+        }
+      : {};
+  const queryFilter: Prisma.ProblemWhereInput = options.query
+    ? {
+        OR: [
+          { title: { contains: options.query, mode: "insensitive" } },
+          { tags: { some: { name: { contains: options.query, mode: "insensitive" } } } },
+        ],
+      }
+    : {};
+  const where: Prisma.ProblemWhereInput = {
+    AND: [
+      available,
+      typeFilter,
+      queryFilter,
+      ...(options.difficulty
+        ? [{ difficulty: { equals: options.difficulty, mode: "insensitive" as const } }]
+        : []),
+    ],
+  };
+
+  const [problems, total] = await prisma.$transaction([
+    prisma.problem.findMany({
+    where,
     select: {
       id: true,
       slug: true,
@@ -84,10 +125,59 @@ export async function listProblems() {
       publishAfterChallenge: true,
       tags: { select: { name: true } },
     },
-    orderBy: { createdAt: "desc" },
-  });
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (options.page - 1) * options.limit,
+    take: options.limit,
+  }),
+    prisma.problem.count({ where }),
+  ]);
 
-  return problems.map((problem) => {
+  const problemIds = problems.map((problem) => problem.id);
+  const [submissionCounts, acceptedCounts, userAcceptedCounts] = problemIds.length
+    ? await Promise.all([
+        prisma.submission.groupBy({
+          by: ["problemId"],
+          where: {
+            problemId: { in: problemIds },
+            mode: "SUBMIT",
+            status: "COMPLETED",
+          },
+          _count: { _all: true },
+        }),
+        prisma.submission.groupBy({
+          by: ["problemId"],
+          where: {
+            problemId: { in: problemIds },
+            mode: "SUBMIT",
+            status: "COMPLETED",
+            verdict: "accepted",
+          },
+          _count: { _all: true },
+        }),
+        prisma.submission.groupBy({
+          by: ["problemId"],
+          where: {
+            problemId: { in: problemIds },
+            userId: options.userId,
+            mode: "SUBMIT",
+            status: "COMPLETED",
+            verdict: "accepted",
+          },
+          _count: { _all: true },
+        }),
+      ])
+    : [[], [], []];
+  const attemptsByProblem = new Map(
+    submissionCounts.map((entry) => [entry.problemId, entry._count._all]),
+  );
+  const acceptedByProblem = new Map(
+    acceptedCounts.map((entry) => [entry.problemId, entry._count._all]),
+  );
+  const userSolvesByProblem = new Map(
+    userAcceptedCounts.map((entry) => [entry.problemId, entry._count._all]),
+  );
+
+  const items = problems.map((problem) => {
     const challengeActive =
       problem.kind === "CHALLENGE" &&
       Boolean(problem.challengeEndsAt && problem.challengeEndsAt > now);
@@ -96,8 +186,25 @@ export async function listProblems() {
       originalKind: problem.kind,
       kind: challengeActive ? "CHALLENGE" : "QUESTION",
       challengeActive,
+      userSolveCount: userSolvesByProblem.get(problem.id) ?? 0,
+      acceptanceRate: attemptsByProblem.get(problem.id)
+        ? Math.round(
+            ((acceptedByProblem.get(problem.id) ?? 0) /
+              attemptsByProblem.get(problem.id)!) *
+              1000,
+          ) / 10
+        : null,
     };
   });
+  return {
+    problems: items,
+    pagination: {
+      page: options.page,
+      limit: options.limit,
+      total,
+      hasMore: options.page * options.limit < total,
+    },
+  };
 }
 
 export async function getProblemBySlug(slug: string) {
@@ -157,5 +264,15 @@ export async function saveDraft(
     },
     update: { code },
     create: { userId, problemId, language, code },
+  });
+}
+
+export async function deleteDraft(
+  userId: string,
+  problemId: string,
+  language: string,
+) {
+  return prisma.codeDraft.deleteMany({
+    where: { userId, problemId, language },
   });
 }

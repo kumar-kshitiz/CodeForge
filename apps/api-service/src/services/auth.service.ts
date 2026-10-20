@@ -5,7 +5,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, JwtPayload } fro
 import { RegisterInput, LoginInput } from '../validators/auth.validator';
 import { env } from '../config/env';
 
-const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export type SafeUser = Omit<User, 'passwordHash'>;
 

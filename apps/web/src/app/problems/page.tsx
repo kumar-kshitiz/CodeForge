@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../../store/authStore";
@@ -14,32 +14,54 @@ interface Problem {
   challengeActive: boolean;
   challengeEndsAt?: string | null;
   tags: { name: string }[];
+  userSolveCount: number;
+  acceptanceRate: number | null;
 }
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const PAGE_SIZE = 12;
 
-function shuffleQuestions(problems: Problem[]): Problem[] {
-  const shuffled = problems.filter((problem) => problem.kind === "QUESTION");
-  for (let index = shuffled.length - 1; index > 0; index--) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[randomIndex]] = [
-      shuffled[randomIndex],
-      shuffled[index],
-    ];
-  }
-  return shuffled;
+interface ShuffleDeck {
+  deckId: string;
+  cards: { token: string }[];
+  expiresAt: string;
 }
 
-export default function ProblemsPage() {
+interface SelectedCard {
+  token: string;
+  slug: string;
+}
+
+export default function ProblemsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = use(searchParams);
   const router = useRouter();
   const { token, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [problems, setProblems] = useState<Problem[]>([]);
-  const [deckProblems, setDeckProblems] = useState<Problem[]>([]);
+  const [deck, setDeck] = useState<ShuffleDeck | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [revealedTitles, setRevealedTitles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [difficulty, setDifficulty] = useState("all");
-  const [contentType, setContentType] = useState("all");
+  const [contentType, setContentType] = useState(mode === "shuffle" ? "mystery" : "all");
   const [retry, setRetry] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [nextPage, setNextPage] = useState(2);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
@@ -47,7 +69,19 @@ export default function ProblemsPage() {
     }
     if (!token) return;
     const controller = new AbortController();
-    fetch(`${API}/api/problems`, {
+    setLoading(true);
+    setError("");
+    const shuffle = contentType === "mystery";
+    if (!shuffle) setProblems([]);
+    const params = new URLSearchParams({
+      page: "1",
+      limit: String(PAGE_SIZE),
+      type: contentType,
+    });
+    if (difficulty !== "all") params.set("difficulty", difficulty);
+    if (debouncedQuery) params.set("query", debouncedQuery);
+    fetch(`${API}/api/problems${shuffle ? "/shuffle" : `?${params.toString()}`}`, {
+      method: shuffle ? "POST" : "GET",
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
@@ -57,11 +91,21 @@ export default function ProblemsPage() {
         return res.json();
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
+        if (shuffle) {
+          setDeck(data);
+          setSelectedCard(null);
+          setRevealedTitles({});
+          setSelecting(false);
+          return;
+        }
         const loadedProblems = Array.isArray(data.problems)
           ? (data.problems as Problem[])
           : [];
         setProblems(loadedProblems);
-        setDeckProblems(shuffleQuestions(loadedProblems));
+        setTotal(data.pagination?.total ?? loadedProblems.length);
+        setHasMore(Boolean(data.pagination?.hasMore));
+        setNextPage(2);
       })
       .catch((err) => {
         if (err.name !== "AbortError")
@@ -73,17 +117,72 @@ export default function ProblemsPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [authLoading, isAuthenticated, token, router, retry]);
-  const filtered = problems.filter(
-    (p) =>
-      (contentType === "all" ||
-        (contentType === "questions" && p.kind === "QUESTION") ||
-        (contentType === "challenges" && p.kind === "CHALLENGE")) &&
-      (difficulty === "all" || p.difficulty.toLowerCase() === difficulty) &&
-      `${p.title} ${p.tags.map((t) => t.name).join(" ")}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  }, [authLoading, isAuthenticated, token, router, retry, contentType, difficulty, debouncedQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (!token || loadingMore || !hasMore || contentType === "mystery") return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        page: String(nextPage),
+        limit: String(PAGE_SIZE),
+        type: contentType,
+      });
+      if (difficulty !== "all") params.set("difficulty", difficulty);
+      if (debouncedQuery) params.set("query", debouncedQuery);
+      const response = await fetch(`${API}/api/problems?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not load more challenges.");
+      const loadedProblems = Array.isArray(data.problems) ? data.problems as Problem[] : [];
+      setProblems((current) => [...current, ...loadedProblems]);
+      setTotal(data.pagination?.total ?? total);
+      setHasMore(Boolean(data.pagination?.hasMore));
+      setNextPage((current) => current + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load more challenges.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [token, loadingMore, hasMore, contentType, nextPage, difficulty, debouncedQuery, total]);
+
+  useEffect(() => {
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger || !hasMore || contentType === "mystery") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading && !loadingMore) void loadMore();
+      },
+      { rootMargin: "400px 0px" },
+    );
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [hasMore, contentType, loading, loadingMore, loadMore]);
+
+  async function selectCard(cardToken: string) {
+    if (!deck || selecting || loading) return;
+    setSelecting(true);
+    setError("");
+    try {
+      const response = await fetch(`${API}/api/problems/shuffle/${deck.deckId}/select`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cardToken }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not open this card.");
+      setRevealedTitles(Object.fromEntries(
+        (data.cards ?? []).map((card: { token: string; title: string }) => [card.token, card.title]),
+      ));
+      setSelectedCard({ token: data.selectedToken, slug: data.slug });
+      setSelecting(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not open this card.");
+      setSelecting(false);
+    }
+  }
   if (authLoading || !isAuthenticated)
     return (
       <div className="empty-state" role="status">
@@ -119,7 +218,13 @@ export default function ProblemsPage() {
                 <button
                   key={value}
                   aria-pressed={contentType === value}
-                  onClick={() => setContentType(value)}
+                  disabled={selecting}
+                  onClick={() => {
+                    setLoading(true);
+                    setError("");
+                    setContentType(value);
+                    if (value === contentType) setRetry((v) => v + 1);
+                  }}
                 >
                   {label}
                 </button>
@@ -131,7 +236,10 @@ export default function ProblemsPage() {
                   <button
                     key={level}
                     aria-pressed={difficulty === level}
-                    onClick={() => setDifficulty(level)}
+                    onClick={() => {
+                      setLoading(true);
+                      setDifficulty(level);
+                    }}
                   >
                     {level === "all" ? "Any level" : level}
                   </button>
@@ -143,7 +251,12 @@ export default function ProblemsPage() {
             <button
               type="button"
               className="btn-ghost deck-shuffle-button"
-              onClick={() => setDeckProblems(shuffleQuestions(problems))}
+              disabled={loading || selecting}
+              onClick={() => {
+                setLoading(true);
+                setError("");
+                setRetry((v) => v + 1);
+              }}
             >
               Shuffle again ↻
             </button>
@@ -163,8 +276,8 @@ export default function ProblemsPage() {
             {loading
               ? "Finding your next challenge…"
               : contentType === "mystery"
-                ? `${deckProblems.length} mystery cards are waiting`
-                : `${filtered.length} questions and challenges to explore`}
+                ? `${deck?.cards.length ?? 0} mystery cards are waiting`
+                : `${total} questions and challenges to explore`}
           </span>
           <span>
             {contentType === "mystery"
@@ -193,46 +306,64 @@ export default function ProblemsPage() {
               <div className="challenge-skeleton" key={i} />
             ))}
           </div>
-        ) : contentType === "mystery" && deckProblems.length > 0 ? (
+        ) : contentType === "mystery" && (deck?.cards.length ?? 0) > 0 ? (
           <div className="mystery-deck-section">
             <div className="mystery-deck-intro">
               <span className="eyebrow">CODE QUEST SHUFFLE</span>
               <h2>Pick a card. Meet your next problem.</h2>
               <p>
-                Every card hides a normal practice question. Its title, topic,
-                and difficulty stay secret until you choose.
+                Every card holds a practice question. Choose one to reveal it;
+                topics and difficulty stay hidden while you solve.
               </p>
             </div>
             <div className="mystery-card-grid">
-              {deckProblems.map((problem, index) => (
-                <button
-                  type="button"
-                  className={`mystery-card mystery-card-${index % 4}`}
-                  key={problem.id}
-                  onClick={() =>
-                    router.push(`/problems/${problem.slug}?mode=shuffle`)
-                  }
-                  aria-label={`Choose mystery question card ${index + 1}`}
-                >
-                  <span className="mystery-card-corner">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="mystery-card-symbol" aria-hidden="true">
-                    {index % 4 === 0
-                      ? "{?}"
-                      : index % 4 === 1
-                        ? "✦"
-                        : index % 4 === 2
-                          ? "⌁"
-                          : "</>"}
-                  </span>
-                  <strong>Pick me</strong>
-                  <small>Question and level stay a mystery</small>
-                </button>
-              ))}
+              {deck!.cards.map((card, index) => {
+                const cardNumber = String(index + 1).padStart(2, "0");
+                const symbol = index % 4 === 0 ? "{?}" : index % 4 === 1 ? "✦" : index % 4 === 2 ? "⌁" : "</>";
+                const revealedTitle = revealedTitles[card.token];
+                if (revealedTitle) {
+                  const selected = selectedCard?.token === card.token;
+                  return (
+                    <article
+                      className={`mystery-card mystery-card-${index % 4} mystery-card-revealed ${selected ? "mystery-card-selected" : ""}`}
+                      key={card.token}
+                      aria-live="polite"
+                    >
+                      <span className="mystery-card-corner">{cardNumber}</span>
+                      <span className="mystery-card-symbol" aria-hidden="true">{selected ? "✓" : symbol}</span>
+                      <small>{selected ? "YOUR PICK" : "REVEALED"}</small>
+                      <strong>{revealedTitle}</strong>
+                      {selected && (
+                        <button
+                          type="button"
+                          className="mystery-solve-button"
+                          onClick={() => router.push(`/problems/${selectedCard.slug}?mode=shuffle`)}
+                        >
+                          Solve ↗
+                        </button>
+                      )}
+                    </article>
+                  );
+                }
+                return (
+                  <button
+                    type="button"
+                    className={`mystery-card mystery-card-${index % 4}`}
+                    key={card.token}
+                    disabled={selecting || loading || Boolean(selectedCard)}
+                    onClick={() => selectCard(card.token)}
+                    aria-label={`Choose mystery question card ${index + 1}`}
+                  >
+                    <span className="mystery-card-corner">{cardNumber}</span>
+                    <span className="mystery-card-symbol" aria-hidden="true">{symbol}</span>
+                    <strong>{selecting ? "Opening…" : "Pick me"}</strong>
+                    <small>Question and level stay a mystery</small>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : problems.length === 0 ? (
           <div className="empty-state">
             <h2>No challenges here just yet.</h2>
             <p>
@@ -254,8 +385,9 @@ export default function ProblemsPage() {
             )}
           </div>
         ) : (
+          <>
           <div className="challenge-grid">
-            {filtered.map((p, i) => (
+            {problems.map((p, i) => (
               <Link
                 href={`/problems/${p.slug}`}
                 className="challenge-card"
@@ -275,10 +407,15 @@ export default function ProblemsPage() {
                   </span>
                 </div>
                 <h2>{p.title}</h2>
-                <div className="challenge-tags">
-                  {p.tags.map((t) => (
-                    <span key={t.name}>{t.name}</span>
-                  ))}
+                <div className="challenge-card-stats">
+                  <span>
+                    <small>YOUR SOLVES</small>
+                    <strong>{p.userSolveCount.toLocaleString()}</strong>
+                  </span>
+                  <span>
+                    <small>ACCEPTANCE</small>
+                    <strong>{p.acceptanceRate === null ? "—" : `${p.acceptanceRate}%`}</strong>
+                  </span>
                 </div>
                 <div className="challenge-card-footer">
                   <div>
@@ -295,6 +432,23 @@ export default function ProblemsPage() {
               </Link>
             ))}
           </div>
+          {hasMore && (
+            <div
+              ref={loadMoreTriggerRef}
+              className="challenge-load-more"
+              role="status"
+              aria-live="polite"
+              aria-busy={loadingMore}
+            >
+              {loadingMore && <span className="challenge-loader-dot" aria-hidden="true" />}
+              <span>
+                {loadingMore
+                  ? "Loading more challenges…"
+                  : `Scroll for more · ${problems.length} of ${total}`}
+              </span>
+            </div>
+          )}
+          </>
         )}
       </section>
     </div>

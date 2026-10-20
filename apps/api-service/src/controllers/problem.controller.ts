@@ -22,8 +22,23 @@ export async function listProblems(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const problems = await problemService.listProblems();
-    res.json({ problems });
+    const page = Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1);
+    const limit = Math.min(30, Math.max(1, Number.parseInt(String(req.query.limit ?? "12"), 10) || 12));
+    const requestedType = String(req.query.type ?? "all");
+    const type = (["all", "questions", "challenges"].includes(requestedType)
+      ? requestedType
+      : "all") as "all" | "questions" | "challenges";
+    const difficulty = String(req.query.difficulty ?? "").trim() || undefined;
+    const query = String(req.query.query ?? "").trim().slice(0, 100) || undefined;
+    const result = await problemService.listProblems({
+      page,
+      limit,
+      type,
+      difficulty,
+      query,
+      userId: req.user!.id,
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -88,7 +103,7 @@ export async function saveDraft(
       return;
     }
 
-    if (!language || !code) {
+    if (!language || typeof code !== "string") {
       res.status(400).json({ error: "Language and code are required" });
       return;
     }
@@ -100,6 +115,31 @@ export async function saveDraft(
       code,
     );
     res.json({ draft });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteDraft(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const language = req.query.language;
+    if (typeof language !== "string" || !language) {
+      res.status(400).json({ error: "Language is required" });
+      return;
+    }
+
+    const problem = await problemService.getProblemBySlug(req.params.slug);
+    if (!problem) {
+      res.status(404).json({ error: "Problem not found" });
+      return;
+    }
+
+    await problemService.deleteDraft(req.user!.id, problem.id, language);
+    res.status(204).send();
   } catch (err) {
     next(err);
   }

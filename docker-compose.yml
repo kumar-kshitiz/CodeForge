@@ -47,11 +47,34 @@ services:
       JWT_REFRESH_SECRET: change_me_refresh_secret
       INTERNAL_SERVICE_KEY: change_me_internal_service_key
       FRONTEND_URL: http://localhost:3000
+      TEAM_COMPETITION_SERVICE_URL: http://team-competition-service:3002
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  team-competition-service:
+    build:
+      context: .
+      dockerfile: apps/team-competition-service/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: change_me_access_secret
+      API_SERVICE_URL: http://api-service:3001
+      INTERNAL_SERVICE_KEY: change_me_internal_service_key
+      FRONTEND_URL: http://localhost:3000
+      MATCH_TTL_SECONDS: 86400
+    depends_on:
+      redis:
+        condition: service_healthy
+      api-service:
+        condition: service_started
 
   execution-service:
     build:

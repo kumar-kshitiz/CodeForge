@@ -6,6 +6,7 @@ export const createSubmissionSchema = z.object({
   language: z.enum(SUPPORTED_LANGUAGES, { message: "Unsupported language" }),
   sourceCode: z.string().min(1, "Source code cannot be empty").max(50000),
   problemId: z.string().min(1, "Problem is required"),
+  teamMatchId: z.string().uuid().optional(),
   mode: z.enum(["RUN", "SUBMIT"]).default("SUBMIT"),
 });
 

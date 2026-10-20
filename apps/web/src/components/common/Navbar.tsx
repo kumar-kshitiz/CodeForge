@@ -36,6 +36,9 @@ export default function Navbar() {
         </Link>
 
         <div className="nav-links">
+          <Link href="/teams" className="nav-link nav-teams">
+            Team Battles
+          </Link>
           <Link href="/problems" className="nav-link nav-challenges">
             Challenges
           </Link>
@@ -45,6 +48,11 @@ export default function Navbar() {
           {(user?.role === "ADMIN" || user?.role === "INTERVIEWER") && (
             <Link href="/admin/problems/new" className="nav-link nav-admin">
               Problem studio
+            </Link>
+          )}
+          {user?.role === "ADMIN" && (
+            <Link href="/admin/ability-puzzles/new" className="nav-link nav-admin">
+              Ability puzzles
             </Link>
           )}
           <ThemeToggle />

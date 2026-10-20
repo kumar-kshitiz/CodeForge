@@ -44,7 +44,7 @@ export default function RegisterPage() {
       }
 
       setAuth(data.user, data.accessToken);
-      router.push('/problems');
+      router.replace('/problems');
     } catch {
       setError('Network error');
     } finally {

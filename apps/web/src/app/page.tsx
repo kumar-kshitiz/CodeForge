@@ -1,5 +1,6 @@
 import Link from "next/link";
 import CodePlayground from "../components/common/CodePlayground";
+import StartCodingLink from "../components/common/StartCodingLink";
 
 export default function Home() {
   return (
@@ -105,9 +106,7 @@ export default function Home() {
             starts right here.
           </h2>
         </div>
-        <Link href="/register" className="btn-primary-lg">
-          Let’s get coding ↗
-        </Link>
+        <StartCodingLink />
       </section>
       <footer className="site-footer">
         <Link href="/" className="brand">
