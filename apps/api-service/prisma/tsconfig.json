@@ -1,0 +1,9 @@
+{
+  "extends": "@codeforge/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "types": ["node"]
+  },
+  "include": ["./*.ts", "../src/**/*.ts"]
+}

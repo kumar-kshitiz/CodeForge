@@ -1,0 +1,158 @@
+import { cpp20Syntax } from "./cpp20Syntax";
+import { pythonSyntax } from "./pythonSyntax";
+import { javascriptSyntax } from "./javascriptSyntax";
+
+export type SupportedSyntaxLanguage = "javascript" | "python" | "cpp";
+
+export type SyntaxEntry = {
+  keyword: string;
+  syntax: string;
+  description: string;
+};
+
+const javascript: SyntaxEntry[] = [
+  { keyword: "print", syntax: "console.log(value);", description: "Print a value to standard output." },
+  { keyword: "input", syntax: "const input = require('fs').readFileSync(0, 'utf8').trim();", description: "Read all standard input." },
+  { keyword: "split", syntax: "const values = input.split(/\\s+/);", description: "Split input on whitespace." },
+  { keyword: "numbers", syntax: "const nums = input.split(/\\s+/).map(Number);", description: "Parse whitespace-separated numbers." },
+  { keyword: "variable", syntax: "let value = 0;", description: "Declare a mutable variable." },
+  { keyword: "constant", syntax: "const value = 0;", description: "Declare a block-scoped constant." },
+  { keyword: "array", syntax: "const arr = [];", description: "Create an empty array." },
+  { keyword: "matrix", syntax: "const matrix = Array.from({ length: rows }, () => Array(cols).fill(0));", description: "Create a two-dimensional array." },
+  { keyword: "length", syntax: "arr.length", description: "Get the number of array elements or string characters." },
+  { keyword: "push", syntax: "arr.push(value);", description: "Add a value to the end of an array." },
+  { keyword: "pop", syntax: "const value = arr.pop();", description: "Remove and return the last array value." },
+  { keyword: "shift", syntax: "const value = arr.shift();", description: "Remove and return the first array value." },
+  { keyword: "sort", syntax: "arr.sort((a, b) => a - b);", description: "Sort numbers in ascending order." },
+  { keyword: "reverse", syntax: "arr.reverse();", description: "Reverse an array in place." },
+  { keyword: "slice", syntax: "const part = arr.slice(start, end);", description: "Copy a half-open range from an array." },
+  { keyword: "join", syntax: "const text = arr.join(' ');", description: "Join array elements into a string." },
+  { keyword: "map", syntax: "const result = arr.map((value) => transform(value));", description: "Transform every array element." },
+  { keyword: "filter", syntax: "const result = arr.filter((value) => condition(value));", description: "Keep array elements that satisfy a condition." },
+  { keyword: "reduce", syntax: "const sum = arr.reduce((total, value) => total + value, 0);", description: "Reduce an array to one value." },
+  { keyword: "set", syntax: "const seen = new Set();\nseen.add(value);\nseen.has(value);", description: "Create and use a set of unique values." },
+  { keyword: "hash map", syntax: "const counts = new Map();\ncounts.set(key, (counts.get(key) ?? 0) + 1);", description: "Store key-value pairs in a map." },
+  { keyword: "stack", syntax: "const stack = [];\nstack.push(value);\nconst top = stack.pop();", description: "Use an array as a LIFO stack." },
+  { keyword: "queue", syntax: "const queue = [];\nqueue.push(value);\nconst front = queue.shift();", description: "Use an array as a basic FIFO queue." },
+  { keyword: "if", syntax: "if (condition) {\n  // code\n} else {\n  // code\n}", description: "Run code conditionally." },
+  { keyword: "switch", syntax: "switch (value) {\n  case option:\n    break;\n  default:\n    break;\n}", description: "Choose between multiple cases." },
+  { keyword: "for", syntax: "for (let i = 0; i < n; i++) {\n  // code\n}", description: "Create an indexed loop." },
+  { keyword: "for of", syntax: "for (const value of arr) {\n  // code\n}", description: "Iterate over array values." },
+  { keyword: "while", syntax: "while (condition) {\n  // code\n}", description: "Repeat while a condition is true." },
+  { keyword: "function", syntax: "function solve(value) {\n  return value;\n}", description: "Declare a function." },
+  { keyword: "arrow function", syntax: "const solve = (value) => value;", description: "Declare an arrow function." },
+  { keyword: "class", syntax: "class Node {\n  constructor(value) {\n    this.value = value;\n  }\n}", description: "Declare a class with a constructor." },
+  { keyword: "min", syntax: "const minimum = Math.min(...arr);", description: "Find the minimum array value." },
+  { keyword: "max", syntax: "const maximum = Math.max(...arr);", description: "Find the maximum array value." },
+  { keyword: "power", syntax: "const result = base ** exponent;", description: "Raise a number to a power." },
+  { keyword: "sqrt", syntax: "const root = Math.sqrt(value);", description: "Calculate a square root." },
+  { keyword: "gcd", syntax: "const gcd = (a, b) => b === 0 ? Math.abs(a) : gcd(b, a % b);", description: "Compute the greatest common divisor." },
+  { keyword: "binary search", syntax: "let left = 0, right = arr.length - 1;\nwhile (left <= right) {\n  const mid = Math.floor((left + right) / 2);\n  if (arr[mid] === target) break;\n  if (arr[mid] < target) left = mid + 1;\n  else right = mid - 1;\n}", description: "Search a sorted array in logarithmic time." },
+];
+
+const python: SyntaxEntry[] = [
+  { keyword: "print", syntax: "print(value)", description: "Print a value to standard output." },
+  { keyword: "input", syntax: "value = input().strip()", description: "Read one line of input." },
+  { keyword: "numbers", syntax: "nums = list(map(int, input().split()))", description: "Read whitespace-separated integers." },
+  { keyword: "all input", syntax: "import sys\ndata = sys.stdin.buffer.read().split()", description: "Read all standard input efficiently." },
+  { keyword: "variable", syntax: "value = 0", description: "Assign a value to a variable." },
+  { keyword: "list", syntax: "arr = []", description: "Create an empty list." },
+  { keyword: "matrix", syntax: "matrix = [[0] * cols for _ in range(rows)]", description: "Create an independent two-dimensional list." },
+  { keyword: "length", syntax: "len(arr)", description: "Get the length of a collection." },
+  { keyword: "append", syntax: "arr.append(value)", description: "Add a value to the end of a list." },
+  { keyword: "pop", syntax: "value = arr.pop()", description: "Remove and return the last list value." },
+  { keyword: "sort", syntax: "arr.sort()", description: "Sort a list in ascending order in place." },
+  { keyword: "sorted", syntax: "result = sorted(arr, key=lambda value: value)", description: "Return a new sorted list." },
+  { keyword: "reverse", syntax: "arr.reverse()", description: "Reverse a list in place." },
+  { keyword: "slice", syntax: "part = arr[start:end]", description: "Copy a half-open range from a sequence." },
+  { keyword: "join", syntax: "text = ' '.join(map(str, arr))", description: "Join values into a string." },
+  { keyword: "list comprehension", syntax: "result = [transform(value) for value in arr if condition(value)]", description: "Build a list with an optional filter." },
+  { keyword: "set", syntax: "seen = set()\nseen.add(value)\nvalue in seen", description: "Create and use a set of unique values." },
+  { keyword: "dictionary", syntax: "counts = {}\ncounts[key] = counts.get(key, 0) + 1", description: "Create and update a dictionary." },
+  { keyword: "counter", syntax: "from collections import Counter\ncounts = Counter(arr)", description: "Count occurrences efficiently." },
+  { keyword: "stack", syntax: "stack = []\nstack.append(value)\ntop = stack.pop()", description: "Use a list as a LIFO stack." },
+  { keyword: "queue", syntax: "from collections import deque\nqueue = deque()\nqueue.append(value)\nfront = queue.popleft()", description: "Create an efficient FIFO queue." },
+  { keyword: "heap", syntax: "import heapq\nheapq.heappush(heap, value)\nsmallest = heapq.heappop(heap)", description: "Use a list as a minimum heap." },
+  { keyword: "if", syntax: "if condition:\n    pass\nelif other_condition:\n    pass\nelse:\n    pass", description: "Run code conditionally." },
+  { keyword: "for", syntax: "for i in range(n):\n    pass", description: "Loop over a numeric range." },
+  { keyword: "enumerate", syntax: "for index, value in enumerate(arr):\n    pass", description: "Iterate with indexes and values." },
+  { keyword: "while", syntax: "while condition:\n    pass", description: "Repeat while a condition is true." },
+  { keyword: "function", syntax: "def solve(value):\n    return value", description: "Declare a function." },
+  { keyword: "lambda", syntax: "square = lambda value: value * value", description: "Create a small anonymous function." },
+  { keyword: "class", syntax: "class Node:\n    def __init__(self, value):\n        self.value = value", description: "Declare a class and initializer." },
+  { keyword: "min", syntax: "minimum = min(arr)", description: "Find the minimum collection value." },
+  { keyword: "max", syntax: "maximum = max(arr)", description: "Find the maximum collection value." },
+  { keyword: "power", syntax: "result = pow(base, exponent)", description: "Raise a number to a power." },
+  { keyword: "sqrt", syntax: "from math import sqrt\nroot = sqrt(value)", description: "Calculate a square root." },
+  { keyword: "gcd", syntax: "from math import gcd\nresult = gcd(a, b)", description: "Compute the greatest common divisor." },
+  { keyword: "binary search", syntax: "from bisect import bisect_left\nindex = bisect_left(arr, target)", description: "Find the insertion position in a sorted list." },
+  { keyword: "infinity", syntax: "infinity = float('inf')", description: "Create a positive infinity value." },
+];
+
+const cpp: SyntaxEntry[] = [
+  { keyword: "print", syntax: "cout << value << '\\n';", description: "Print a value to standard output." },
+  { keyword: "input", syntax: "cin >> value;", description: "Read a whitespace-separated value." },
+  { keyword: "read line", syntax: "string line;\ngetline(cin, line);", description: "Read an entire line, including spaces." },
+  { keyword: "fast io", syntax: "ios::sync_with_stdio(false);\ncin.tie(nullptr);", description: "Enable faster competitive-programming input and output." },
+  { keyword: "variable", syntax: "int value = 0;", description: "Declare an integer variable." },
+  { keyword: "constant", syntax: "const int LIMIT = 100000;", description: "Declare a constant integer." },
+  { keyword: "array", syntax: "std::array<int, 5> arr{};", description: "Fixed compile-time size. Requires <array>." },
+  { keyword: "vector", syntax: "vector<int> arr(n);", description: "Create a dynamic integer array." },
+  { keyword: "matrix", syntax: "vector<vector<int>> matrix(rows, vector<int>(cols, 0));", description: "Create a two-dimensional vector." },
+  { keyword: "length", syntax: "int n = static_cast<int>(arr.size());", description: "Get a container's size as an integer." },
+  { keyword: "push", syntax: "arr.push_back(value);", description: "Add a value to the end of a vector." },
+  { keyword: "pop", syntax: "arr.pop_back();", description: "Remove the last vector value." },
+  { keyword: "sort", syntax: "sort(arr.begin(), arr.end());", description: "Sort a container in ascending order." },
+  { keyword: "sort descending", syntax: "sort(arr.rbegin(), arr.rend());", description: "Sort a container in descending order." },
+  { keyword: "custom sort", syntax: "sort(arr.begin(), arr.end(), [](const auto& a, const auto& b) {\n    return a.second < b.second;\n});", description: "Sort using a custom comparator." },
+  { keyword: "reverse", syntax: "reverse(arr.begin(), arr.end());", description: "Reverse a container in place." },
+  { keyword: "set", syntax: "set<int> values;\nvalues.insert(value);\nbool exists = values.count(value);", description: "Create and use an ordered set." },
+  { keyword: "unordered set", syntax: "unordered_set<int> values;", description: "Create a hash-based set." },
+  { keyword: "map", syntax: "map<string, int> counts;\ncounts[key]++;", description: "Create and update an ordered map." },
+  { keyword: "unordered map", syntax: "unordered_map<string, int> counts;\ncounts[key]++;", description: "Create and update a hash map." },
+  { keyword: "pair", syntax: "pair<int, int> item = {first, second};", description: "Store two related values." },
+  { keyword: "stack", syntax: "stack<int> values;\nvalues.push(value);\nint top = values.top();\nvalues.pop();", description: "Create and use a LIFO stack." },
+  { keyword: "queue", syntax: "queue<int> values;\nvalues.push(value);\nint front = values.front();\nvalues.pop();", description: "Create and use a FIFO queue." },
+  { keyword: "priority queue", syntax: "priority_queue<int, vector<int>, greater<int>> minHeap;", description: "Create a minimum priority queue." },
+  { keyword: "if", syntax: "if (condition) {\n    // code\n} else {\n    // code\n}", description: "Run code conditionally." },
+  { keyword: "switch", syntax: "switch (value) {\n    case option:\n        break;\n    default:\n        break;\n}", description: "Choose between multiple cases." },
+  { keyword: "for", syntax: "for (int i = 0; i < n; i++) {\n    // code\n}", description: "Create an indexed loop." },
+  { keyword: "range loop", syntax: "for (const auto& value : arr) {\n    // code\n}", description: "Iterate over all container values." },
+  { keyword: "while", syntax: "while (condition) {\n    // code\n}", description: "Repeat while a condition is true." },
+  { keyword: "function", syntax: "int solve(int value) {\n    return value;\n}", description: "Declare a function." },
+  { keyword: "lambda", syntax: "auto square = [](int value) { return value * value; };", description: "Create an anonymous function." },
+  { keyword: "class", syntax: "class Node {\npublic:\n    int value;\n    explicit Node(int value) : value(value) {}\n};", description: "Declare a class with a constructor." },
+  { keyword: "min", syntax: "int minimum = *min_element(arr.begin(), arr.end());", description: "Find the minimum container value." },
+  { keyword: "max", syntax: "int maximum = *max_element(arr.begin(), arr.end());", description: "Find the maximum container value." },
+  { keyword: "sum", syntax: "long long sum = accumulate(arr.begin(), arr.end(), 0LL);", description: "Sum all values in a container." },
+  { keyword: "power", syntax: "double result = pow(base, exponent);", description: "Raise a number to a power." },
+  { keyword: "sqrt", syntax: "double root = sqrt(value);", description: "Calculate a square root." },
+  { keyword: "gcd", syntax: "int result = std::gcd(a, b);", description: "Compute the greatest common divisor." },
+  { keyword: "binary search", syntax: "bool found = binary_search(arr.begin(), arr.end(), target);", description: "Check whether a sorted container contains a value." },
+  { keyword: "lower bound", syntax: "auto it = lower_bound(arr.begin(), arr.end(), target);", description: "Find the first position whose value is not less than the target." },
+  { keyword: "upper bound", syntax: "auto it = upper_bound(arr.begin(), arr.end(), target);", description: "Find the first position whose value is greater than the target." },
+];
+
+const cppHeaders: Record<string, string> = {
+  print: "iostream", input: "iostream", "read line": "iostream, string", "fast io": "iostream",
+  vector: "vector", matrix: "vector", set: "set", "unordered set": "unordered_set",
+  map: "map", "unordered map": "unordered_map", pair: "utility", stack: "stack",
+  queue: "queue", "priority queue": "queue, vector, functional", sort: "algorithm",
+  "sort descending": "algorithm", "custom sort": "algorithm", reverse: "algorithm",
+  min: "algorithm", max: "algorithm", sum: "numeric", power: "cmath", sqrt: "cmath",
+  gcd: "numeric", "binary search": "algorithm", "lower bound": "algorithm", "upper bound": "algorithm",
+};
+
+export const syntaxReference: Record<SupportedSyntaxLanguage, SyntaxEntry[]> = {
+  javascript: [...new Map([...javascript, ...javascriptSyntax].map((entry) => [entry.keyword, entry])).values()],
+  python: [...new Map([...python, ...pythonSyntax].map((entry) => [entry.keyword, entry])).values()],
+  cpp: [...new Map([...cpp.map((entry) => ({ ...entry, description: entry.description
+    + (cppHeaders[entry.keyword] ? ` Required headers: ${cppHeaders[entry.keyword]}. Uses standard-library names; qualify with std:: or use a using declaration.` : "") })),
+    ...cpp20Syntax].map((entry) => [entry.keyword, entry])).values()],
+};
+
+export const syntaxLanguageNames: Record<SupportedSyntaxLanguage, string> = {
+  javascript: "JavaScript",
+  python: "Python",
+  cpp: "C++20",
+};

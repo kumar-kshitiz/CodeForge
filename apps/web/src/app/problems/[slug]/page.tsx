@@ -10,7 +10,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import Editor from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import SubmitPanel from "@/components/room/SubmitPanel";
+import SyntaxFinder from "@/components/editor/SyntaxFinder";
+import type { SupportedSyntaxLanguage } from "@/data/syntaxReference";
 import Link from "next/link";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/authStore";
@@ -77,6 +80,7 @@ export default function ProblemWorkspacePage({
   const { theme } = useTheme();
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Autosave draft logic
   const saveDraftTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -214,6 +218,16 @@ export default function ProblemWorkspacePage({
     if (saveDraftTimeout.current) clearTimeout(saveDraftTimeout.current);
     pendingDraft.current = { slug, language, code: newCode, token: getToken() };
     saveDraftTimeout.current = setTimeout(flushDraft, 1000);
+  };
+
+  const insertSyntax = (syntax: string) => {
+    const editorInstance = editorRef.current;
+    const selection = editorInstance?.getSelection();
+    if (!editorInstance || !selection) return;
+    editorInstance.executeEdits("syntax-finder", [
+      { range: selection, text: syntax, forceMoveMarkers: true },
+    ]);
+    editorInstance.focus();
   };
 
   const beginStatementResize = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -444,6 +458,17 @@ export default function ProblemWorkspacePage({
               <option value="cpp">C++</option>
             </select>
             <div className="editor-toolbar-actions">
+              <SyntaxFinder
+                language={language as SupportedSyntaxLanguage}
+                onInsert={insertSyntax}
+                getContext={() => {
+                  const position = editorRef.current?.getPosition();
+                  return {
+                    line: position ? editorRef.current?.getModel()?.getLineContent(position.lineNumber) ?? "" : "",
+                    column: position?.column ?? 1,
+                  };
+                }}
+              />
               <span
                 className="save-status text-muted text-sm"
                 role={draftError ? "alert" : undefined}
@@ -488,6 +513,7 @@ export default function ProblemWorkspacePage({
               theme={theme === "dark" ? "vs-dark" : "light"}
               value={code}
               onChange={handleCodeChange}
+              onMount={(editorInstance) => { editorRef.current = editorInstance; }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,

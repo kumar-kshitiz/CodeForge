@@ -37,7 +37,7 @@ export class CppRunner extends BaseRunner {
         memory: `${memoryLimitMb}m`,
         cpus: SANDBOX_CONFIG.CPUS,
         volumes: [`${workspaceDir}:/workspace:rw`],
-        command: `g++ /workspace/source.cpp -o /workspace/a.out`,
+        command: `g++ -std=c++20 /workspace/source.cpp -o /workspace/a.out`,
       });
       return {
         verdict: "accepted",
