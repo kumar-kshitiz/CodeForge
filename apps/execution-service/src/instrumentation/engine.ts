@@ -1,12 +1,12 @@
 export class InstrumentationEngine {
   /**
    * Returns the exact number of lines injected at the top of the file.
-   * This is crucial for correcting compiler and runtime error line numbers.
+   * Deriving it from the generated output keeps error mapping in sync when a
+   * trace header changes.
    */
   static getInjectionOffset(language: string): number {
-    if (language === 'javascript' || language === 'js') return 16;
-    if (language === 'cpp' || language === 'c++') return 20;
-    return 0; // Python uses DriverInjector which appends at the bottom, so top offset is 0
+    const instrumentedEmptySource = this.instrument('', language);
+    return instrumentedEmptySource.split('\n').length - 1;
   }
 
   /**
@@ -42,17 +42,18 @@ function __trace(event_type, location, variables, operation) {
 }
 // -----------------------------------
 `;
-    // Regex heuristics for injection
+    // Keep injected calls on the matched source line so the header is the only
+    // line-number offset introduced by instrumentation.
     // 1. Trace function start (recursion)
     let injected = code.replace(
       /(function\s+([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{)/g,
-      `$1\n  __trace('function_enter', '$2', {}, 'call');\n`
+      `$1 __trace('function_enter', '$2', {}, 'call');`
     );
 
     // 2. Trace loop start (for/while)
     injected = injected.replace(
       /(while\s*\([^)]+\)\s*\{|for\s*\([^)]+\)\s*\{)/g,
-      `$1\n  __trace('loop_iteration', 'loop', {}, 'iteration');\n`
+      `$1 __trace('loop_iteration', 'loop', {}, 'iteration');`
     );
 
     return traceHeader + injected;
@@ -81,6 +82,8 @@ void __trace(const std::string& event_type, const std::string& location, const s
 }
 // ------------------------------------
 `;
+    // Keep injected calls on the matched source line so the header is the only
+    // line-number offset introduced by instrumentation.
     // Basic regex injection (not perfect, but sufficient for heuristic smart targeting)
     // Avoid modifying inside standard library includes
     let body = code;
@@ -88,13 +91,13 @@ void __trace(const std::string& event_type, const std::string& location, const s
     // 1. Trace function start (recursion) - rough heuristic for C++
     body = body.replace(
       /([a-zA-Z0-9_<>:]+\s+)([a-zA-Z0-9_]+)\s*\(([^)]*)\)\s*\{/g,
-      `$1$2($3) {\n  __trace("function_enter", "$2", "", "call");\n`
+      `$1$2($3) { __trace("function_enter", "$2", "", "call");`
     );
 
     // 2. Trace loop start
     body = body.replace(
       /(while\s*\([^)]+\)\s*\{|for\s*\([^)]+\)\s*\{)/g,
-      `$1\n  __trace("loop_iteration", "loop", "", "iteration");\n`
+      `$1 __trace("loop_iteration", "loop", "", "iteration");`
     );
 
     return traceHeader + body;

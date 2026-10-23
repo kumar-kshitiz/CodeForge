@@ -6,7 +6,6 @@ import type {
   RunnerOptions,
   RunnerResult,
 } from "./runner.interface";
-import { DriverInjector } from "./drivers/driver.injector";
 import { InstrumentationEngine } from "../instrumentation/engine";
 import { TraceParser } from "../instrumentation/parser";
 import { TraceCollector } from "../instrumentation/collector";
@@ -45,7 +44,7 @@ export abstract class BaseRunner implements LanguageRunner {
       const result = await Promise.race([dockerPromise, timeoutPromise]);
       let runtimeMs = Date.now() - startTime;
       // Deduct Docker overhead (~350ms) to approximate true execution time like an IDE
-      runtimeMs = Math.max(1, runtimeMs - 350);
+      // runtimeMs = Math.max(1, runtimeMs - 350);
 
       // Parse Traces
       const lineOffset = InstrumentationEngine.getInjectionOffset(
@@ -73,7 +72,7 @@ export abstract class BaseRunner implements LanguageRunner {
       };
     } catch (err: any) {
       let runtimeMs = Date.now() - startTime;
-      runtimeMs = Math.max(1, runtimeMs - 350);
+      // runtimeMs = Math.max(1, runtimeMs - 350);
 
       // For errors, we also want to parse traces to see what happened before crash
       const lineOffset = InstrumentationEngine.getInjectionOffset(
@@ -124,7 +123,7 @@ export abstract class BaseRunner implements LanguageRunner {
 
   protected abstract getExecutionCommand(): string;
 
-  protected preprocessCode(code: string, problemSlug?: string): string {
+  protected preprocessCode(code: string): string {
     const lang =
       this.extension === "py"
         ? "python"
@@ -132,11 +131,7 @@ export abstract class BaseRunner implements LanguageRunner {
           ? "javascript"
           : "cpp";
 
-    // 1. Inject instrumentation logic
-    const instrumentedCode = InstrumentationEngine.instrument(code, lang);
-
-    // 2. Inject I/O drivers
-    return DriverInjector.inject(instrumentedCode, lang, problemSlug);
+    return InstrumentationEngine.instrument(code, lang);
   }
 
   protected async compile(
@@ -152,14 +147,13 @@ export abstract class BaseRunner implements LanguageRunner {
     const {
       submissionId,
       code,
-      problemSlug,
       timeLimitMs,
       memoryLimitMb,
       testCases,
     } = options;
     let workspace;
 
-    const finalCode = this.preprocessCode(code, problemSlug);
+    const finalCode = this.preprocessCode(code);
 
     try {
       workspace = await createWorkspace(finalCode, this.extension);

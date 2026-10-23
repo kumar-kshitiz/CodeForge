@@ -13,17 +13,6 @@ export class CppRunner extends BaseRunner {
     return `sh -c "/workspace/a.out < /workspace/input.txt"`;
   }
 
-  protected preprocessCode(code: string, problemSlug?: string): string {
-    let finalCode = super.preprocessCode(code, problemSlug);
-
-    // Fallback: if DriverInjector didn't inject a main and user didn't write one, inject dummy
-    if (!/\bmain\s*\(/.test(finalCode)) {
-      finalCode +=
-        "\n\n// Auto-generated main to allow compilation\nint main() {\n    return 0;\n}\n";
-    }
-    return finalCode;
-  }
-
   protected async compile(
     workspaceDir: string,
     submissionId: string,
