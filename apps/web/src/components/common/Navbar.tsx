@@ -45,7 +45,7 @@ export default function Navbar() {
           <Link href="/#how-it-works" className="nav-link nav-about">
             How it works
           </Link>
-          {(user?.role === "ADMIN" || user?.role === "INTERVIEWER") && (
+          {(user?.role === "ADMIN") && (
             <Link href="/admin/problems/new" className="nav-link nav-admin">
               Problem studio
             </Link>

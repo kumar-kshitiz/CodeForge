@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { useTeamRealtime } from "@/hooks/useTeamRealtime";
 
 const TEAM_API = process.env.NEXT_PUBLIC_TEAM_COMPETITION_URL ?? "http://localhost:3002";
 
@@ -36,43 +37,18 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
   const targetTeam = match?.teams.find((team) => team.id === myTeam?.draftsForTeamId);
 
   const matchUrl = `${TEAM_API}/api/matches/${matchId}`;
+  useTeamRealtime<Match>(token, matchId, setMatch, setError);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.replace("/login");
-    if (!token) return;
-    const controller = new AbortController();
-    fetch(matchUrl, { headers, signal: controller.signal })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "Could not load match");
-        return data.match as Match;
-      })
-      .then(setMatch)
-      .catch((reason) => {
-        if (reason.name !== "AbortError") {
-          setError(
-            reason instanceof TypeError
-              ? "Team service is unavailable on port 3002. Start the workspace services and try again."
-              : reason.message,
-          );
-        }
-      });
-    return () => controller.abort();
-  }, [token, isAuthenticated, isLoading, matchUrl, router, headers]);
+  }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    if (!token) return;
-    const refresh = () => {
-      setNow(Date.now());
-      fetch(matchUrl, { headers })
-        .then((response) => response.ok ? response.json() : null)
-        .then((data) => { if (data?.match) setMatch(data.match); })
-        .catch(() => undefined);
-    };
-    const initial = window.setTimeout(refresh, 0);
-    const timer = window.setInterval(refresh, 2000);
+    const tick = () => setNow(Date.now());
+    const initial = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
-  }, [token, matchUrl, headers]);
+  }, []);
 
   useEffect(() => {
     if (match?.redirectToMatchId) {

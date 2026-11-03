@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { useTeamRealtime } from "@/hooks/useTeamRealtime";
 
 const TEAM_API =
   process.env.NEXT_PUBLIC_TEAM_COMPETITION_URL ?? "http://localhost:3002";
@@ -33,6 +34,7 @@ export default function TeamCompetitionsPage() {
   const [destroying, setDestroying] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [error, setError] = useState("");
+  useTeamRealtime<CurrentMatch>(token, undefined, setCurrentMatch, setError, () => setCurrentLoading(false));
 
   const headers = useMemo(() => ({
     Authorization: `Bearer ${token}`,
@@ -46,23 +48,6 @@ export default function TeamCompetitionsPage() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  useEffect(() => {
-    if (!token) return;
-    const controller = new AbortController();
-    fetch(`${TEAM_API}/api/matches/mine`, { headers, signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Could not restore your active squad");
-        return response.json();
-      })
-      .then((data) => setCurrentMatch(data.match ?? null))
-      .catch((reason) => {
-        if (reason.name !== "AbortError") setError(reason.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCurrentLoading(false);
-      });
-    return () => controller.abort();
-  }, [token, headers]);
 
   async function createMatch(event: React.FormEvent) {
     event.preventDefault();

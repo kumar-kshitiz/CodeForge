@@ -49,7 +49,7 @@ export default function ProblemsPage({
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [difficulty, setDifficulty] = useState("all");
-  const [contentType, setContentType] = useState(mode === "shuffle" ? "mystery" : "all");
+  const [contentType, setContentType] = useState(mode === "shuffle" ? "mystery" : "questions");
   const [retry, setRetry] = useState(0);
   const [total, setTotal] = useState(0);
   const [nextPage, setNextPage] = useState(2);
@@ -210,7 +210,6 @@ export default function ProblemsPage({
           <div className="library-filter-groups">
             <div className="filter-tabs" aria-label="Content type">
               {[
-                ["all", "All"],
                 ["questions", "Questions"],
                 ["challenges", "Live challenges"],
                 ["mystery", "Code Quest Shuffle"],
@@ -220,10 +219,10 @@ export default function ProblemsPage({
                   aria-pressed={contentType === value}
                   disabled={selecting}
                   onClick={() => {
+                    if (value === contentType) return;
                     setLoading(true);
                     setError("");
                     setContentType(value);
-                    if (value === contentType) setRetry((v) => v + 1);
                   }}
                 >
                   {label}
@@ -377,7 +376,7 @@ export default function ProblemsPage({
                 onClick={() => {
                   setQuery("");
                   setDifficulty("all");
-                  setContentType("all");
+                  setContentType("questions");
                 }}
               >
                 Clear filters
