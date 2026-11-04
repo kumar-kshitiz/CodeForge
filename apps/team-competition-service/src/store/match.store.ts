@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { EventEmitter } from "events";
 import { env } from "../config/env";
 import type { TeamMatch } from "../types/match";
 
@@ -10,6 +11,24 @@ const redis = new Redis(env.redisUrl, {
 redis.on("error", () => undefined);
 
 const memory = new Map<string, TeamMatch>();
+const notifications = new EventEmitter();
+const channel = "team-match:changes";
+let subscriber: Redis | undefined;
+export interface MatchChange { matchId: string; userIds: string[]; deleted: boolean }
+export function onMatchChange(listener: (event: MatchChange) => void): () => void {
+  notifications.on("change", listener);
+  return () => { notifications.off("change", listener); };
+}
+async function notifyMatch(match: TeamMatch, deleted = false): Promise<void> {
+  const event: MatchChange = { matchId: match.id, deleted,
+    userIds: [...new Set([match.createdBy, ...match.teams.flatMap(t => t.players.map(p => p.userId))])] };
+  if (useMemoryStore) notifications.emit("change", event);
+  else {
+    // Persistence succeeds independently of best-effort realtime delivery.
+    try { await redis.publish(channel, JSON.stringify(event)); }
+    catch { console.error("[team-realtime] notification publish failed"); }
+  }
+}
 const memoryMembership = new Map<string, string>();
 const memoryOwnership = new Map<string, string>();
 let useMemoryStore = false;
@@ -26,9 +45,18 @@ const queueKey = (difficulty: string, teamCount: number) =>
 export async function connectStore(): Promise<void> {
   try {
     await redis.connect();
+    subscriber = redis.duplicate();
+    subscriber.on("error", () => undefined);
+    subscriber.on("message", (_channel, message) => {
+      try { notifications.emit("change", JSON.parse(message) as MatchChange); }
+      catch { console.error("[team-realtime] invalid notification"); }
+    });
+    await subscriber.connect();
+    await subscriber.subscribe(channel);
   } catch (error) {
     if (process.env.NODE_ENV === "production") throw error;
     useMemoryStore = true;
+    subscriber?.disconnect();
     redis.disconnect();
     console.warn(
       "[team-competition-service] Redis unavailable; using the development-only in-memory store",
@@ -37,6 +65,7 @@ export async function connectStore(): Promise<void> {
 }
 
 export async function closeStore(): Promise<void> {
+  if (subscriber?.status === "ready") await subscriber.quit();
   if (useMemoryStore) return;
   await redis.quit();
 }
@@ -48,6 +77,7 @@ export async function saveMatch(match: TeamMatch): Promise<void> {
       team.players.forEach((player) => memoryMembership.set(player.userId, match.id)),
     );
     memoryOwnership.set(match.createdBy, match.id);
+    await notifyMatch(match);
     return;
   }
   const serialized = JSON.stringify(match);
@@ -67,6 +97,7 @@ export async function saveMatch(match: TeamMatch): Promise<void> {
     ),
   );
   await transaction.exec();
+  await notifyMatch(match);
 }
 
 export async function getMatch(id: string): Promise<TeamMatch | null> {
@@ -161,6 +192,7 @@ export async function destroyStoredMatch(match: TeamMatch): Promise<void> {
     userIds.forEach((userId) => {
       if (memoryMembership.get(userId) === match.id) memoryMembership.delete(userId);
     });
+    await notifyMatch(match, true);
     return;
   }
   const transaction = redis
@@ -176,6 +208,7 @@ export async function destroyStoredMatch(match: TeamMatch): Promise<void> {
     if (indexedMatchId === match.id) transaction.del(membershipKey(userId));
   }
   await transaction.exec();
+  await notifyMatch(match, true);
 }
 
 export async function enqueueMatch(match: TeamMatch): Promise<void> {
@@ -251,21 +284,28 @@ export async function updateMatch(
         team.players.forEach((player) => memoryMembership.set(player.userId, id)),
       );
     }
+    await notifyMatch(next);
     return next;
   }
   const key = matchKey(id);
+  // WATCH is connection-scoped. Concurrent HTTP actions and deadline timers
+  // must not share a transaction's watched keys.
+  const connection = redis.duplicate({ lazyConnect: true });
+  connection.on("error", () => undefined);
+  try {
+  await connection.connect();
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    await redis.watch(key);
-    const current = await redis.get(key);
+    await connection.watch(key);
+    const current = await connection.get(key);
     if (!current) {
-      await redis.unwatch();
+      await connection.unwatch();
       throw Object.assign(new Error("Match not found"), { statusCode: 404 });
     }
 
     const next = update(JSON.parse(current) as TeamMatch);
     next.version += 1;
     next.updatedAt = new Date().toISOString();
-    const transaction = redis
+    const transaction = connection
       .multi()
       .set(key, JSON.stringify(next), "EX", env.matchTtlSeconds);
     if (next.status !== "CANCELLED") {
@@ -281,11 +321,17 @@ export async function updateMatch(
       );
     }
     const result = await transaction.exec();
-    if (result) return next;
+    if (result) {
+      await notifyMatch(next);
+      return next;
+    }
   }
   throw Object.assign(new Error("Match changed; please try again"), {
     statusCode: 409,
   });
+  } finally {
+    connection.disconnect();
+  }
 }
 
 export async function withMatchmakingLock<T>(
