@@ -301,7 +301,7 @@ export default function ProblemsPage({
           </div>
         ) : loading ? (
           <div className="challenge-grid" aria-busy="true">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div className="challenge-skeleton" key={i} />
             ))}
           </div>
@@ -370,18 +370,6 @@ export default function ProblemsPage({
                 ? "Try another search or difficulty."
                 : "Check back soon for your next challenge."}
             </p>
-            {problems.length > 0 && (
-              <button
-                className="btn-ghost"
-                onClick={() => {
-                  setQuery("");
-                  setDifficulty("all");
-                  setContentType("questions");
-                }}
-              >
-                Clear filters
-              </button>
-            )}
           </div>
         ) : (
           <>
