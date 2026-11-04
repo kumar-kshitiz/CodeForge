@@ -153,6 +153,10 @@ export abstract class BaseRunner implements LanguageRunner {
     } = options;
     let workspace;
 
+    if (testCases.length === 0) {
+      throw new Error("At least one test case is required for execution");
+    }
+
     const finalCode = this.preprocessCode(code);
 
     try {
@@ -165,30 +169,6 @@ export abstract class BaseRunner implements LanguageRunner {
       );
       if (compileResult && compileResult.verdict !== "accepted") {
         return compileResult;
-      }
-
-      if (!testCases || testCases.length === 0) {
-        // Fallback for no test cases
-        const fs = require("fs");
-        const path = require("path");
-        fs.writeFileSync(path.join(workspace.dirPath, "input.txt"), "");
-        const containerName = `codeforge-exec-${submissionId}`;
-        const result = await this.runSteps(
-          workspace.dirPath,
-          containerName,
-          timeLimitMs,
-          memoryLimitMb,
-        );
-        return {
-          verdict: result.verdict,
-          stdout: result.stdout,
-          stderr: result.stderr,
-          runtimeMs: result.runtimeMs,
-          snapshot: result.snapshot,
-          runtimeIntelligence: result.runtimeIntelligence,
-          passedTestCases: 0,
-          totalTestCases: 0,
-        };
       }
 
       let passed = 0;

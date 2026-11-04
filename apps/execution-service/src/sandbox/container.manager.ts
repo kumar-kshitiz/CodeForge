@@ -11,7 +11,7 @@ export interface ExecuteOptions {
   problemSlug?: string;
   timeLimitMs: number;
   memoryLimitMb: number;
-  testCases?: TestCasePayload[];
+  testCases: TestCasePayload[];
 }
 
 export async function executeCodeInSandbox(

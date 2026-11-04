@@ -9,7 +9,16 @@ async function main() {
     problemSlug: undefined,
     timeLimitMs: 2000,
     memoryLimitMb: 256,
-    testCases: [],
+    testCases: [
+      {
+        id: "compile-test-case",
+        input: "",
+        expectedOutput: "",
+        visibility: "PUBLIC",
+        points: 1,
+        position: 0,
+      },
+    ],
   });
   console.log(res1);
 

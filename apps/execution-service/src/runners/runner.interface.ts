@@ -19,13 +19,12 @@ export interface RunnerOptions {
   problemSlug?: string;
   timeLimitMs: number;
   memoryLimitMb: number;
-  testCases?: TestCasePayload[];
+  testCases: TestCasePayload[];
 }
 
 export interface LanguageRunner {
-  /**
-   * File extension for the source code file (e.g., 'js', 'py', 'cpp')
-   */
+
+   /* File extension for the source code file (e.g., 'js', 'py', 'cpp')*/
   readonly extension: string;
 
   /**
