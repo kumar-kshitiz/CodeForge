@@ -17,6 +17,7 @@ import type { SupportedSyntaxLanguage } from "@/data/syntaxReference";
 import Link from "next/link";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/authStore";
+import TeamMatchNotice from "@/components/teams/TeamMatchNotice";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 // Keep pending saves ordered even when navigation remounts the workspace.
@@ -303,13 +304,15 @@ export default function ProblemWorkspacePage({
   }
 
   return (
-    <div
-      className="workspace-container workspace-resizable"
-      ref={workspaceRef}
-      style={workspaceStyle}
-    >
-      {/* LEFT PANEL: Problem Details */}
-      <div className="workspace-left">
+    <>
+      <TeamMatchNotice matchId={teamMatchId} />
+      <div
+        className="workspace-container workspace-resizable"
+        ref={workspaceRef}
+        style={workspaceStyle}
+      >
+        {/* LEFT PANEL: Problem Details */}
+        <div className="workspace-left">
         <div className="problem-header">
           <div className="panel-heading-row">
             {contestId ? (
@@ -581,7 +584,8 @@ export default function ProblemWorkspacePage({
             teamMatchId={teamMatchId}
           />}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

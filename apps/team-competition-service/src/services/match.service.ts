@@ -11,6 +11,7 @@ import {
   destroyStoredMatch,
   enqueueMatch,
   getActiveMatchForUser,
+  getLatestMatchForUser,
   getMatch,
   getMatchByInviteCode,
   getWaitingMatches,
@@ -56,7 +57,7 @@ export async function createMatch(
   if (!inviteCode) fail("Could not reserve an invite code", 503);
   const teams: Team[] = [{
     id: randomUUID(),
-    name: "Your squad",
+    name: input.name,
     color: TEAM_COLORS[0],
     players: [playerFrom(user)],
     selectedQuestionIds: [],
@@ -84,7 +85,25 @@ export async function createMatch(
 export { getMatch };
 
 export async function getCurrentMatch(userId: string): Promise<TeamMatch | null> {
-  return getActiveMatchForUser(userId);
+  return getLatestMatchForUser(userId);
+}
+
+export async function syncPlayerName(
+  match: TeamMatch,
+  user: AuthUser,
+): Promise<TeamMatch> {
+  const name = user.username.trim();
+  const player = match.teams
+    .flatMap((team) => team.players)
+    .find((candidate) => candidate.userId === user.id);
+  if (!player || !name || name === "Player" || player.username === name) return match;
+  return updateMatch(match.id, (current) => {
+    const currentPlayer = current.teams
+      .flatMap((team) => team.players)
+      .find((candidate) => candidate.userId === user.id);
+    if (currentPlayer) currentPlayer.username = name;
+    return current;
+  });
 }
 
 export async function joinMatchByCode(
@@ -193,6 +212,7 @@ async function tryGlobalMatchmaking(triggerMatchId: string): Promise<void> {
           match.status === "MATCHMAKING" &&
           match.difficulty === trigger.difficulty &&
           match.desiredTeamCount === trigger.desiredTeamCount &&
+          match.durationMinutes === trigger.durationMinutes &&
           match.teams.length === 1,
       )
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -207,7 +227,7 @@ async function tryGlobalMatchmaking(triggerMatchId: string): Promise<void> {
     const canonical = group[0];
     const mergedTeams = group.map((waitingMatch, index) => ({
       ...waitingMatch.teams[0],
-      name: `Team ${String.fromCharCode(65 + index)}`,
+      name: waitingMatch.name,
       color: TEAM_COLORS[index],
       difficultyVote: trigger.difficulty,
       selectedQuestionIds: [],
@@ -344,7 +364,7 @@ export async function recordScore(input: {
       fail("This question is not assigned to that player", 403);
     }
     if (team.abilityActivatedAt) {
-      fail("Normal coding is locked while the final-five ability is active", 409);
+      fail("Normal coding is locked while Power Surge is active", 409);
     }
     const ratio = input.totalTestCases
       ? Math.min(1, input.passedTestCases / input.totalTestCases)
@@ -388,7 +408,7 @@ export async function validateCodingSubmission(input: {
     fail("This coding question is not assigned to you", 403);
   }
   if (team.abilityActivatedAt) {
-    fail("Your leader activated Final 5%. Normal coding is now locked.", 409);
+    fail("Your leader activated Power Surge. Normal coding is now locked.", 409);
   }
 }
 
@@ -402,13 +422,13 @@ export async function activateAbility(
   }
   return updateMatch(matchId, (match) => {
     const team = requireLiveTeamForUser(match, userId);
-    if (team.leaderId !== userId) fail("Only the team leader can activate Final 5%", 403);
+    if (team.leaderId !== userId) fail("Only the team leader can activate Power Surge", 403);
     const remaining = Date.parse(match.endsAt!) - Date.now();
-    const unlockWindow = match.durationMinutes * 60_000 * 0.05;
+    const unlockWindow = match.durationMinutes * 60_000 * 0.1;
     if (remaining > unlockWindow) {
-      fail("Final 5% unlocks during the last 5% of the match", 409);
+      fail("Power Surge unlocks during the last 10% of the match", 409);
     }
-    if (team.abilityActivatedAt) fail("Final 5% is already active", 409);
+    if (team.abilityActivatedAt) fail("Power Surge is already active", 409);
     team.abilityActivatedAt = new Date().toISOString();
     team.abilityPuzzleScore = team.abilityPuzzleScore ?? 0;
     team.currentPuzzleId = undefined;
@@ -422,8 +442,8 @@ export async function getAbilityPuzzle(matchId: string, userId: string) {
   const snapshot = await getMatch(matchId);
   if (!snapshot) fail("Match not found", 404);
   const team = requireLiveTeamForUser(snapshot, userId);
-  if (team.leaderId !== userId) fail("Only the team leader can play Final 5%", 403);
-  if (!team.abilityActivatedAt) fail("Final 5% has not been activated", 409);
+  if (team.leaderId !== userId) fail("Only the team leader can play Power Surge", 403);
+  if (!team.abilityActivatedAt) fail("Power Surge has not been activated", 409);
 
   let puzzle = puzzles.find((candidate) => candidate.id === team.currentPuzzleId);
   if (!puzzle) {
@@ -432,7 +452,7 @@ export async function getAbilityPuzzle(matchId: string, userId: string) {
     puzzle = pool[randomInt(pool.length)];
     await updateMatch(matchId, (match) => {
       const liveTeam = requireLiveTeamForUser(match, userId);
-      if (!liveTeam.abilityActivatedAt) fail("Final 5% has not been activated", 409);
+      if (!liveTeam.abilityActivatedAt) fail("Power Surge has not been activated", 409);
       liveTeam.currentPuzzleId = puzzle!.id;
       return match;
     });
@@ -464,23 +484,22 @@ export async function answerAbilityPuzzle(
       );
   const match = await updateMatch(matchId, (current) => {
     const team = requireLiveTeamForUser(current, userId);
-    if (team.leaderId !== userId) fail("Only the team leader can play Final 5%", 403);
-    if (!team.abilityActivatedAt) fail("Final 5% has not been activated", 409);
+    if (team.leaderId !== userId) fail("Only the team leader can play Power Surge", 403);
+    if (!team.abilityActivatedAt) fail("Power Surge has not been activated", 409);
     if (team.currentPuzzleId !== puzzleId) fail("This puzzle is no longer active", 409);
-    if (correct) {
-      team.abilityPuzzleScore = (team.abilityPuzzleScore ?? 0) + 1;
-      team.score =
-        team.players.reduce((total, player) => total + player.score, 0) +
-        team.abilityPuzzleScore;
-      team.lastPuzzleId = puzzleId;
-      team.currentPuzzleId = undefined;
-    }
+    team.abilityPuzzleScore = (team.abilityPuzzleScore ?? 0) + (correct ? 1 : -0.5);
+    team.score =
+      team.players.reduce((total, player) => total + player.score, 0) +
+      team.abilityPuzzleScore;
+    // Power Surge is a battle: every puzzle gets exactly one attempt.
+    team.lastPuzzleId = puzzleId;
+    team.currentPuzzleId = undefined;
     return current;
   });
   const team = match.teams.find((candidate) => candidate.leaderId === userId)!;
   return {
     correct,
-    explanation: puzzle.explanation ?? null,
+    explanation: correct ? puzzle.explanation ?? null : null,
     abilityScore: team.abilityPuzzleScore,
   };
 }

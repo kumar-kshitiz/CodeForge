@@ -15,7 +15,7 @@ function toSafeUser(user: User): SafeUser {
 }
 
 function buildPayload(user: User): JwtPayload {
-  return { sub: user.id, email: user.email, role: user.role };
+  return { sub: user.id, email: user.email, role: user.role, username: user.username };
 }
 
 async function issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {

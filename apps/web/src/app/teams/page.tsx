@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useTeamRealtime } from "@/hooks/useTeamRealtime";
+import { formatTeamScore } from "@/utils/teamScore";
 
 const TEAM_API =
   process.env.NEXT_PUBLIC_TEAM_COMPETITION_URL ?? "http://localhost:3002";
@@ -16,13 +17,14 @@ interface CurrentMatch {
   status: string;
   difficulty?: string;
   desiredTeamCount: number;
-  teams: { players: unknown[] }[];
+  winnerTeamIds: string[];
+  teams: { id: string; name: string; players: { userId: string }[]; score: number }[];
 }
 
 export default function TeamCompetitionsPage() {
   const router = useRouter();
   const { token, user, isAuthenticated, isLoading } = useAuthStore();
-  const [name, setName] = useState("Friday Code Clash");
+  const [name, setName] = useState("Friday Code Squad");
   const [teamCount, setTeamCount] = useState(2);
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [creating, setCreating] = useState(false);
@@ -33,6 +35,7 @@ export default function TeamCompetitionsPage() {
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [destroying, setDestroying] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [startAnother, setStartAnother] = useState(false);
   const [error, setError] = useState("");
   useTeamRealtime<CurrentMatch>(token, undefined, setCurrentMatch, setError, () => setCurrentLoading(false));
 
@@ -40,6 +43,13 @@ export default function TeamCompetitionsPage() {
     Authorization: `Bearer ${token}`,
     "x-player-name": user?.username ?? "Player",
   }), [token, user?.username]);
+  const currentTeam = currentMatch?.teams.find((team) =>
+    team.players.some((player) => player.userId === user?.id),
+  );
+  const finished = currentMatch?.status === "FINISHED";
+  const winners = finished
+    ? currentMatch.teams.filter((team) => currentMatch.winnerTeamIds.includes(team.id))
+    : [];
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -161,13 +171,17 @@ export default function TeamCompetitionsPage() {
       <section className="team-hub-grid">
         {currentLoading ? (
           <div className="team-create-card team-current-card"><span className="team-card-index">01 / YOUR SQUAD</span><h2>Restoring your squad…</h2></div>
-        ) : currentMatch ? (
+        ) : currentMatch && !startAnother ? (
           <article className="team-create-card team-current-card">
-            <span className="team-card-index">01 / CONTINUE YOUR SQUAD</span>
+            <span className="team-card-index">{finished ? "01 / LATEST RESULT" : "01 / CONTINUE YOUR SQUAD"}</span>
             <div className="current-squad-status"><span>{currentMatch.status}</span>{currentMatch.difficulty && <span>{currentMatch.difficulty}</span>}</div>
-            <h2>{currentMatch.name}</h2>
-            <p>{currentMatch.teams[0]?.players.length ?? 0}/8 players · Looking for {currentMatch.desiredTeamCount} teams</p>
-            <button
+            <h2>{currentMatch.teams.length > 1 ? currentTeam?.name ?? currentMatch.name : currentMatch.name}</h2>
+            <p>{finished
+              ? `${winners.length > 1 ? "Tie" : `${winners[0]?.name ?? "Winner"} won`} · ${currentTeam?.name ?? "Your team"}: ${formatTeamScore(currentTeam?.score ?? 0)} points`
+              : currentMatch.status === "MATCHMAKING"
+                ? `${currentTeam?.players.length ?? 0}/8 players · Looking for ${currentMatch.desiredTeamCount - 1} opponent team${currentMatch.desiredTeamCount === 2 ? "" : "s"}`
+                : `${currentTeam?.players.length ?? 0}/8 players · ${currentMatch.teams.length > 1 ? `${currentMatch.teams.length} teams matched` : `Preparing a ${currentMatch.desiredTeamCount}-team match`}`}</p>
+            {currentMatch.status === "LOBBY" && <button
               type="button"
               className="current-squad-code"
               onClick={copyInviteCode}
@@ -176,8 +190,9 @@ export default function TeamCompetitionsPage() {
             >
               <small aria-live="polite">{inviteCopied ? "COPIED!" : "INVITE CODE · CLICK TO COPY"}</small>
               <strong>{currentMatch.inviteCode}</strong>
-            </button>
-            <button className="team-primary-button" onClick={() => router.push(`/teams/${currentMatch.id}`)}>Continue squad ↗</button>
+            </button>}
+            <button className="team-primary-button" onClick={() => router.push(`/teams/${currentMatch.id}`)}>{finished ? "View final scoreboard ↗" : "Continue squad ↗"}</button>
+            {finished && <button type="button" className="team-secondary-button" onClick={() => setStartAnother(true)}>Create another match</button>}
             {user?.id === currentMatch.createdBy && ["LOBBY", "MATCHMAKING"].includes(currentMatch.status) && (
               <div className="destroy-squad-action">
                 {confirmDestroy ? <><p>This removes the squad for every member. This cannot be undone.</p><div><button type="button" onClick={() => setConfirmDestroy(false)}>Keep squad</button><button type="button" onClick={destroySquad} disabled={destroying}>{destroying ? "Destroying…" : "Yes, destroy squad"}</button></div></> : <button type="button" onClick={() => setConfirmDestroy(true)}>Destroy this squad</button>}
@@ -189,7 +204,7 @@ export default function TeamCompetitionsPage() {
           <span className="team-card-index">01 / CREATE A SQUAD</span>
           <h2>Start from scratch</h2>
           <label>
-            Match name
+            Team name
             <input value={name} onChange={(event) => setName(event.target.value)} maxLength={60} />
           </label>
           <div className="team-form-row">

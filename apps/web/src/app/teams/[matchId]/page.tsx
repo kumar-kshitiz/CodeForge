@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useTeamRealtime } from "@/hooks/useTeamRealtime";
+import { formatTeamScore } from "@/utils/teamScore";
 
 const TEAM_API = process.env.NEXT_PUBLIC_TEAM_COMPETITION_URL ?? "http://localhost:3002";
 
@@ -110,11 +111,11 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
         body: "{}",
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not activate Final 5%");
+      if (!response.ok) throw new Error(data.error ?? "Could not activate Power Surge");
       setMatch(data.match);
       await loadAbilityPuzzle();
     } catch (reason) {
-      setAbilityMessage(reason instanceof Error ? reason.message : "Could not activate Final 5%");
+      setAbilityMessage(reason instanceof Error ? reason.message : "Could not activate Power Surge");
     } finally {
       setAbilityBusy(false);
     }
@@ -135,15 +136,13 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not submit answer");
-      if (data.result.correct) {
-        setAbilityMessage(`Correct · +1 point · Blitz score ${data.result.abilityScore}`);
-        setAbilityPuzzle(null);
-        setAbilityAnswer("");
-        await loadAbilityPuzzle();
-        await fetch(matchUrl, { headers }).then((value) => value.json()).then((value) => setMatch(value.match));
-      } else {
-        setAbilityMessage(data.result.explanation ? `Not quite · ${data.result.explanation}` : "Not quite · try again");
-      }
+      setAbilityMessage(data.result.correct
+        ? `Correct · +1 point · Power Surge score ${data.result.abilityScore}`
+        : `Wrong · −0.5 point · Power Surge score ${data.result.abilityScore}`);
+      setAbilityPuzzle(null);
+      setAbilityAnswer("");
+      await loadAbilityPuzzle();
+      await fetch(matchUrl, { headers }).then((value) => value.json()).then((value) => setMatch(value.match));
     } catch (reason) {
       setAbilityMessage(reason instanceof Error ? reason.message : "Could not submit answer");
     } finally {
@@ -163,7 +162,8 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
 
   const secondsLeft = match?.endsAt ? Math.max(0, Math.ceil((Date.parse(match.endsAt) - now) / 1000)) : 0;
   const clock = `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}`;
-  const abilityUnlockSeconds = Math.ceil((match?.durationMinutes ?? 0) * 60 * 0.05);
+  const abilityUnlockSeconds = Math.ceil((match?.durationMinutes ?? 0) * 60 * 0.1);
+  const abilityScore = myTeam?.abilityPuzzleScore ?? 0;
 
   if (isLoading || !match) return <div className="team-loading">{error || "Opening the arena…"}</div>;
 
@@ -172,7 +172,7 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
       <header className="arena-header">
         <div>
           <Link href="/teams">← Team matches</Link>
-          <button
+          {match.status === "LOBBY" && <button
             type="button"
             className="arena-invite-code"
             onClick={copyInviteCode}
@@ -181,9 +181,9 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
           >
             <span aria-live="polite">{inviteCopied ? "COPIED!" : "INVITE CODE"}</span>
             <b>{match.inviteCode}</b>
-          </button>
+          </button>}
         </div>
-        <h1>{match.name}</h1>
+        <h1>{match.teams.length > 1 ? myTeam?.name ?? match.name : match.name}</h1>
         <div className="arena-stage"><span>{match.status}</span>{match.difficulty && <span>{match.difficulty}</span>}{match.status === "LIVE" && <strong>{clock}</strong>}</div>
       </header>
       {error && <div className="arena-alert" role="alert">{error}</div>}
@@ -232,9 +232,9 @@ export default function TeamMatchPage({ params }: { params: Promise<{ matchId: s
       {(match.status === "LIVE" || match.status === "FINISHED") && (
         <section className="live-panel">
           <div className="score-hero"><div><span className="team-kicker">{match.status === "FINISHED" ? "FINAL SCORE" : "ROUND IN PROGRESS"}</span><h2>{match.status === "FINISHED" ? (match.winnerTeamIds.length > 1 ? "It’s a tie." : `${match.teams.find((team) => team.id === match.winnerTeamIds[0])?.name} wins!`) : "Solve yours. Lift the team."}</h2></div>{match.status === "LIVE" && <strong>{clock}</strong>}</div>
-          <div className={`score-grid count-${match.teams.length}`}>{[...match.teams].sort((a, b) => b.score - a.score).map((team, index) => <article key={team.id} style={{ "--team-color": team.color } as React.CSSProperties}><header><span>#{index + 1}</span><div><h3>{team.name}</h3><small>{team.players.filter((player) => player.solvedAt).length}/{team.players.length} solved</small></div><strong>{team.score.toFixed(0)}</strong></header><ul>{team.players.map((player) => <li key={player.userId}><div><span>{player.username.slice(0, 1).toUpperCase()}</span><p><b>{player.username}</b><small>{player.questionTitle}</small></p></div><strong>{player.score.toFixed(0)}</strong></li>)}</ul></article>)}</div>
-          {match.status === "LIVE" && secondsLeft > 0 && secondsLeft <= abilityUnlockSeconds && isLeader && !myTeam?.abilityActivatedAt && <div className="ability-unlock"><div><span className="team-kicker">SPECIAL ABILITY UNLOCKED · FINAL 5%</span><h2>Risk the code. Chase the points.</h2><p>Optional: activate an endless one-point puzzle blitz for the final 5% of this match. The moment you activate it, normal coding locks for every member of {myTeam?.name} until time expires.</p></div><div><button onClick={activateAbility} disabled={abilityBusy}>{abilityBusy ? "Activating…" : "Activate Final 5% ↗"}</button><small>You may keep coding and ignore this ability.</small></div></div>}
-          {match.status === "LIVE" && myTeam?.abilityActivatedAt && <div className="ability-active"><div className="ability-active-heading"><div><span className="team-kicker">FINAL 5% ACTIVE · CODING LOCKED</span><h2>{isLeader ? "One puzzle. One point. Keep moving." : "Your leader took the Final 5% wager."}</h2><p>{isLeader ? `Every correct answer adds one point to ${myTeam.name}.` : "Normal coding is locked for your whole team. Follow the live score while your leader plays the puzzle blitz."}</p></div><strong>+{myTeam.abilityPuzzleScore ?? 0}</strong></div>{isLeader && <div className="ability-puzzle">{abilityPuzzle ? <><p>{abilityPuzzle.prompt}</p>{abilityPuzzle.responseType === "CHOICE" && abilityPuzzle.options ? <div>{abilityPuzzle.options.map((option, index) => <button key={`${abilityPuzzle.id}-${index}`} onClick={() => answerAbility(index)} disabled={abilityBusy}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}</div> : <form onSubmit={(event) => { event.preventDefault(); answerAbility(); }}><input value={abilityAnswer} onChange={(event) => setAbilityAnswer(event.target.value)} placeholder="Type your answer" required autoComplete="off" /><button disabled={abilityBusy || !abilityAnswer.trim()}>{abilityBusy ? "Checking…" : "Submit answer →"}</button></form>}</> : <button className="ability-next" onClick={loadAbilityPuzzle} disabled={abilityBusy}>{abilityBusy ? "Loading…" : "Load next puzzle →"}</button>}{abilityMessage && <small>{abilityMessage}</small>}</div>}</div>}
+          <div className={`score-grid count-${match.teams.length}`}>{[...match.teams].sort((a, b) => b.score - a.score).map((team, index) => <article key={team.id} style={{ "--team-color": team.color } as React.CSSProperties}><header><span>#{index + 1}</span><div><h3>{team.name}</h3><small>{team.players.filter((player) => player.solvedAt).length}/{team.players.length} solved</small></div><strong>{formatTeamScore(team.score)}</strong></header><ul>{team.players.map((player) => <li key={player.userId}><div><span>{player.username.slice(0, 1).toUpperCase()}</span><p><b>{player.username}</b><small>{player.questionTitle}</small></p></div><strong>{formatTeamScore(player.score)}</strong></li>)}</ul></article>)}</div>
+          {match.status === "LIVE" && secondsLeft > 0 && secondsLeft <= abilityUnlockSeconds && isLeader && !myTeam?.abilityActivatedAt && <div className="ability-unlock"><div><span className="team-kicker">POWER SURGE UNLOCKED · FINAL 10%</span><h2>Risk the code. Chase the points.</h2><p>Power Surge is available during the final 10% of this match. Correct answers earn 1 point and incorrect answers lose 0.5. Activating it locks normal coding for every member of {myTeam?.name} until time expires.</p>{abilityMessage && <p className="ability-error" role="alert">{abilityMessage}</p>}</div><div><button onClick={activateAbility} disabled={abilityBusy}>{abilityBusy ? "Activating…" : "Activate Power Surge ↗"}</button><small>You may keep coding and ignore this power.</small></div></div>}
+          {match.status === "LIVE" && myTeam?.abilityActivatedAt && <div className="ability-active"><div className="ability-active-heading"><div><span className="team-kicker">POWER SURGE ACTIVE · CODING LOCKED</span><h2>{isLeader ? "One attempt. Score or lose." : "Your leader activated Power Surge."}</h2><p>{isLeader ? `Correct: +1 · Incorrect: −0.5 · Points apply to ${myTeam.name}.` : "Normal coding is locked for your whole team. Follow the live score while your leader plays the puzzle blitz."}</p></div><strong>{abilityScore > 0 ? "+" : ""}{abilityScore}</strong></div>{isLeader && <div className="ability-puzzle">{abilityPuzzle ? <><p>{abilityPuzzle.prompt}</p>{abilityPuzzle.responseType === "CHOICE" && abilityPuzzle.options ? <div>{abilityPuzzle.options.map((option, index) => <button key={`${abilityPuzzle.id}-${index}`} onClick={() => answerAbility(index)} disabled={abilityBusy}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}</div> : <form onSubmit={(event) => { event.preventDefault(); answerAbility(); }}><input value={abilityAnswer} onChange={(event) => setAbilityAnswer(event.target.value)} placeholder="Type your answer" required autoComplete="off" /><button disabled={abilityBusy || !abilityAnswer.trim()}>{abilityBusy ? "Checking…" : "Submit answer →"}</button></form>}</> : <button className="ability-next" onClick={loadAbilityPuzzle} disabled={abilityBusy}>{abilityBusy ? "Loading…" : "Load next puzzle →"}</button>}{abilityMessage && <small>{abilityMessage}</small>}</div>}</div>}
           {match.status === "LIVE" && me?.questionSlug && !myTeam?.abilityActivatedAt && <div className="my-assignment"><div><span className="team-kicker">YOUR ASSIGNMENT</span><h2>{me.questionTitle}</h2><p>Chosen by your opponents. Every passing test adds to {myTeam?.name}’s score.</p></div><Link href={`/problems/${me.questionSlug}?teamMatchId=${match.id}`}>Open coding workspace ↗</Link></div>}
         </section>
       )}

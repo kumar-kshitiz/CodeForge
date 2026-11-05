@@ -56,6 +56,7 @@
 .team-hub-error { margin: 18px 0 0; padding: 14px 18px; border: 2px solid #b8321b; background: #ffe5dd; color: #7f2112; }
 .team-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .team-primary-button, .draft-action button { width: 100%; border: 2px solid var(--ink); background: var(--ink); color: white; padding: 17px 22px; font-weight: 800; cursor: pointer; box-shadow: 6px 6px 0 var(--coral); }
+.team-secondary-button { margin-top: 18px; border: 0; background: transparent; color: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
 .team-primary-button:hover, .draft-action button:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--coral); }
 .team-primary-button:disabled, .draft-action button:disabled { opacity: .55; cursor: wait; }
 .team-error { margin-top: 16px; color: #b8321b; font-weight: 700; }
@@ -183,6 +184,7 @@
 .ability-unlock { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 35px; margin-top: 38px; padding: 32px; border: 3px solid #17231f; background: var(--coral); color: #17231f; box-shadow: 9px 9px 0 var(--lime); }
 .ability-unlock h2, .ability-active h2 { margin: 9px 0; font-size: clamp(28px, 4vw, 48px); line-height: .95; letter-spacing: -.045em; }
 .ability-unlock p { max-width: 750px; line-height: 1.55; }
+.ability-unlock .ability-error { margin-top: 12px; padding: 10px 12px; border: 2px solid #17231f; background: #fff; color: #8f2313; font-weight: 800; }
 .ability-unlock > div:last-child { display: grid; gap: 11px; text-align: center; }
 .ability-unlock button { border: 2px solid #17231f; background: #17231f; color: #fff; padding: 17px 21px; font-weight: 900; cursor: pointer; }
 .ability-unlock small { font-size: 11px; }
@@ -202,6 +204,15 @@
 .ability-puzzle > form input::placeholder { color: #aaa4bd; }
 .ability-puzzle > form button { background: var(--lime); border-color: var(--lime); color: #17231f; }
 .ability-puzzle > small { display: block; margin-top: 16px; color: var(--lime); font-weight: 700; }
+.team-workspace-notice { display: flex; align-items: center; justify-content: space-between; gap: 22px; width: calc(100% - 44px); max-width: 1656px; margin: 12px auto 0; padding: 12px 16px; border: 2px solid #17231f; background: #d6ff62; color: #17231f; box-shadow: 5px 5px 0 rgba(23,35,31,.25); }
+.team-workspace-notice > div { display: grid; gap: 3px; min-width: 0; }
+.team-workspace-notice small { font: 800 9px/1 "JetBrains Mono", monospace; letter-spacing: .12em; }
+.team-workspace-notice strong { font-size: 17px; }
+.team-workspace-notice span { font-size: 12px; line-height: 1.35; }
+.team-workspace-notice a { flex: 0 0 auto; padding: 10px 12px; background: #17231f; color: #fff; font-size: 12px; font-weight: 800; text-decoration: none; }
+.team-workspace-notice.urgent { background: #ff7452; animation: team-notice-pulse 1.4s ease-in-out infinite alternate; }
+.team-workspace-notice.finished { background: #f4f1ff; }
+@keyframes team-notice-pulse { to { box-shadow: 9px 9px 0 #d6ff62; transform: translate(-2px, -2px); } }
 .team-loading { min-height: 60vh; display: grid; place-items: center; font-size: 18px; font-weight: 700; }
 
 .ability-admin-page {
@@ -298,4 +309,5 @@
   .ability-admin-page > header { align-items: start; flex-direction: column; }
   .start-matchmaking-card { align-items: stretch; flex-direction: column; }
   .draft-action button { width: 100%; }
+  .team-workspace-notice { width: calc(100% - 28px); margin-top: 10px; }
 }

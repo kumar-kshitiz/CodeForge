@@ -6,7 +6,10 @@ import {
 import * as submissionService from "../services/submission.service";
 import * as aiService from "../services/ai.service";
 import { enqueueSubmission } from "../queue/producer";
-import type { SupportedLanguage } from "@codeforge/shared-types";
+import type {
+  SupportedLanguage,
+  TestCasePayload,
+} from "@codeforge/shared-types";
 import { prisma } from "../prisma/client";
 import { resolveContentKey } from "../utils/content-key";
 import { env } from "../config/env";
@@ -53,7 +56,7 @@ export async function createSubmission(
     let problemSlug: string | undefined;
     let timeLimitMs = 2000;
     let memoryLimitMb = 256;
-    let testCases;
+    let testCases: TestCasePayload[] = [];
 
     if (submission.problemId) {
       const problem = await prisma.problem.findUnique({

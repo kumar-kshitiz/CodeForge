@@ -17,6 +17,7 @@ export async function createSubmission(
       kind: true,
       challengeEndsAt: true,
       publishAfterChallenge: true,
+      testCases: { select: { visibility: true } },
     },
   });
   const challengeEnded =
@@ -27,6 +28,20 @@ export async function createSubmission(
       statusCode: number;
     };
     error.statusCode = 404;
+    throw error;
+  }
+
+  const availableTestCases =
+    input.mode === "RUN"
+      ? problem.testCases.filter((testCase) => testCase.visibility === "PUBLIC")
+      : problem.testCases;
+  if (availableTestCases.length === 0) {
+    const error = new Error(
+      input.mode === "RUN"
+        ? "Problem has no public test cases configured for RUN mode"
+        : "Problem has no test cases configured",
+    ) as Error & { statusCode: number };
+    error.statusCode = 422;
     throw error;
   }
 

@@ -85,7 +85,8 @@ router.post("/join-by-code", async (req, res, next) => {
 
 router.get("/mine", async (req, res, next) => {
   try {
-    res.json({ match: await matches.getCurrentMatch(req.user!.id) });
+    const current = await matches.getCurrentMatch(req.user!.id);
+    res.json({ match: current ? await matches.syncPlayerName(current, req.user!) : null });
   } catch (error) {
     next(error);
   }
@@ -105,6 +106,7 @@ router.get("/:matchId", async (req, res, next) => {
       res.status(403).json({ error: "This is an invite-only squad" });
       return;
     }
+    match = await matches.syncPlayerName(match, req.user!);
     if (match.status === "LIVE" && match.endsAt && Date.now() >= Date.parse(match.endsAt)) {
       match = await matches.finishExpiredMatch(match.id);
     }

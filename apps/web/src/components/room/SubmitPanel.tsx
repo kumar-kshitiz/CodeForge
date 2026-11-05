@@ -151,9 +151,11 @@ export default function SubmitPanel({
     stopPolling();
 
     let attempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 300;
+    let terminal = false;
 
-    pollIntervalRef.current = setInterval(async () => {
+    const poll = async () => {
+      if (terminal) return;
       attempts++;
 
       try {
@@ -171,7 +173,7 @@ export default function SubmitPanel({
 
         const sub = data.submission;
 
-        if (!sub) return;
+        if (!sub || terminal) return;
 
         setStatus(sub.status);
 
@@ -197,27 +199,37 @@ export default function SubmitPanel({
         });
 
         if (sub.status === "COMPLETED" || sub.status === "FAILED") {
+          terminal = true;
           stopPolling();
+          setError("");
           setTimeout(() => {
             setStatus("idle");
             setActiveMode(null);
           }, 2000);
+          return;
         }
       } catch {
         // Ignore transient errors
       }
 
-      if (attempts >= maxAttempts) {
+      if (!terminal && attempts >= maxAttempts) {
         stopPolling();
         setStatus("idle");
         setActiveMode(null);
         setError(
           mode === "RUN"
-            ? "The run is still queued. Make sure Redis and the execution service are running."
-            : "The submission is still queued. Make sure Redis and the execution service are running.",
+            ? "The run result could not be confirmed. Refresh the page to check its latest status."
+            : "The submission result could not be confirmed. Refresh the page to check its latest status.",
         );
+        return;
       }
-    }, 1000);
+
+      if (!terminal) {
+        pollIntervalRef.current = setTimeout(() => { void poll(); }, 1000);
+      }
+    };
+
+    void poll();
   }
 
   const isRunning =

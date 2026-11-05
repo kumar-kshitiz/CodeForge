@@ -131,7 +131,8 @@ export async function getActiveMatchForUser(
     const owned = await getMatch(ownedMatchId);
     if (owned?.redirectToMatchId) {
       const canonical = await getMatch(owned.redirectToMatchId);
-      if (canonical) return canonical;
+      if (canonical?.status !== "FINISHED") return canonical;
+      return null;
     }
     if (
       owned &&
@@ -140,8 +141,12 @@ export async function getActiveMatchForUser(
     ) {
       return owned;
     }
-    if (useMemoryStore) memoryOwnership.delete(userId);
-    else await redis.del(ownershipKey(userId));
+    // Keep finished-match pointers so the results remain reachable from the
+    // dashboard. A newly created match will replace these pointers.
+    if (owned?.status !== "FINISHED") {
+      if (useMemoryStore) memoryOwnership.delete(userId);
+      else await redis.del(ownershipKey(userId));
+    }
   }
 
   const matchId = useMemoryStore
@@ -151,18 +156,45 @@ export async function getActiveMatchForUser(
   const match = await getMatch(matchId);
   if (match?.redirectToMatchId) {
     const canonical = await getMatch(match.redirectToMatchId);
-    if (canonical) return canonical;
+    if (canonical?.status !== "FINISHED") return canonical;
+    return null;
   }
-  if (
-    !match ||
-    match.status === "FINISHED" ||
-    (match.status === "CANCELLED" && !match.redirectToMatchId)
-  ) {
+  if (!match || (match.status === "CANCELLED" && !match.redirectToMatchId)) {
     if (useMemoryStore) memoryMembership.delete(userId);
     else await redis.del(membershipKey(userId));
     return null;
   }
+  if (match.status === "FINISHED") return null;
   return match;
+}
+
+/** Returns the most recent match, including a finished match for result viewing. */
+export async function getLatestMatchForUser(
+  userId: string,
+): Promise<TeamMatch | null> {
+  const ownedMatchId = useMemoryStore
+    ? memoryOwnership.get(userId)
+    : await redis.get(ownershipKey(userId));
+  if (ownedMatchId) {
+    const owned = await getMatch(ownedMatchId);
+    if (owned?.redirectToMatchId) {
+      const canonical = await getMatch(owned.redirectToMatchId);
+      if (canonical) return canonical;
+    }
+    if (owned && !(owned.status === "CANCELLED" && !owned.redirectToMatchId)) {
+      return owned;
+    }
+  }
+
+  const matchId = useMemoryStore
+    ? memoryMembership.get(userId)
+    : await redis.get(membershipKey(userId));
+  if (!matchId) return null;
+  const match = await getMatch(matchId);
+  if (match?.redirectToMatchId) return getMatch(match.redirectToMatchId);
+  return match && !(match.status === "CANCELLED" && !match.redirectToMatchId)
+    ? match
+    : null;
 }
 
 export async function pointUsersToMatch(

@@ -49,7 +49,7 @@ export default function NewAbilityPuzzlePage() {
       setCorrectOption(0);
       setAnswerText("");
       setExplanation("");
-      setMessage("Puzzle saved and added to the Final 5% pool.");
+      setMessage("Puzzle saved and added to the Power Surge pool.");
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Could not save puzzle");
     } finally {
@@ -60,7 +60,7 @@ export default function NewAbilityPuzzlePage() {
   return (
     <div className="ability-admin-page">
       <header>
-        <div><span className="team-kicker">ADMIN · FINAL 5%</span><h1>Create a one-point puzzle.</h1><p>These quick questions appear continuously for leaders who activate the ability during the final 5% of a match.</p></div>
+        <div><span className="team-kicker">ADMIN · POWER SURGE</span><h1>Create a one-point puzzle.</h1><p>These quick questions appear continuously for leaders who activate Power Surge during its configured unlock window.</p></div>
         <Link href="/problems">Back to challenges →</Link>
       </header>
       <form onSubmit={submit}>
@@ -68,7 +68,7 @@ export default function NewAbilityPuzzlePage() {
         <label className="ability-options-toggle"><input type="checkbox" checked={hasOptions} onChange={(event) => setHasOptions(event.target.checked)} />Add multiple-choice options <small>Optional—turn this off for a short text-answer puzzle.</small></label>
         {hasOptions ? <fieldset><legend>Answer options · select the correct one</legend>{options.map((option, index) => <label className="ability-option" key={index}><input type="radio" name="correct" checked={correctOption === index} onChange={() => setCorrectOption(index)} /><span>{String.fromCharCode(65 + index)}</span><input value={option} onChange={(event) => updateOption(index, event.target.value)} required placeholder={`Option ${index + 1}`} /></label>)}</fieldset> : <label>Correct text answer<input className="ability-text-answer" value={answerText} onChange={(event) => setAnswerText(event.target.value)} required placeholder="Accepted answer" /><small>Matching ignores uppercase and lowercase differences.</small></label>}
         <label>Explanation · optional<textarea value={explanation} onChange={(event) => setExplanation(event.target.value)} rows={3} placeholder="A short explanation shown after the answer." /></label>
-        <button className="team-primary-button" disabled={saving}>{saving ? "Saving puzzle…" : "Add to Final 5% ↗"}</button>
+        <button className="team-primary-button" disabled={saving}>{saving ? "Saving puzzle…" : "Add to Power Surge ↗"}</button>
         {message && <p className="ability-admin-message" role="status">{message}</p>}
       </form>
     </div>

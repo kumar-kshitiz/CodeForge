@@ -9,7 +9,9 @@ export function useTeamRealtime<T>(token: string | null, matchId: string | undef
   onMatch: (match: T | null) => void, onError: (message: string) => void,
   onLoaded?: () => void) {
   const callbacks = useRef({ onMatch, onError, onLoaded });
-  callbacks.current = { onMatch, onError, onLoaded };
+  useEffect(() => {
+    callbacks.current = { onMatch, onError, onLoaded };
+  }, [onMatch, onError, onLoaded]);
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
@@ -21,8 +23,13 @@ export function useTeamRealtime<T>(token: string | null, matchId: string | undef
       if (busy) { pending = true; return; }
       busy = true;
       try {
+        const playerName = window.localStorage.getItem("username")?.trim();
         const response = await fetch(`${TEAM_API}/api/matches/${matchId ?? "mine"}`, {
-          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(playerName ? { "x-player-name": playerName } : {}),
+          },
+          signal: controller.signal,
         });
         if (response.status === 404 && matchId) {
           callbacks.current.onMatch(null);
